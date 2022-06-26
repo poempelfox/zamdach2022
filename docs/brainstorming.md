@@ -1,29 +1,36 @@
 
-= Brainstorming / datenmuellhalde
+# Brainstorming / datenmuellhalde
 
-== Possible/selected sensors
+## Possible/selected sensors
 
 - Sunlight
   + MAX44009 Ambient Light sensor (up to 188000 lux)
   + TSL2591 (up to 88000 lux) (in contrast to most others this seems to actually be available)
+  + Whatever sensor we chose, this will need to be directly exposed to the sunlight.
 - Pressure
   + LPS25HB
+  + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
   + SHT31 / SHT35. SHT35 is probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
 - Rain
   + RG15 optical sensor
+  + will need to be mounted on a metal arm on its own
   + there is also a rain gauge on the Sparkfun weather meter kit - but that will probably not last long. We could still connect it up.
 - Wind speed/direction
   + Sparkfun Weather meter kit https://learn.sparkfun.com/tutorials/weather-meter-hookup-guide/all
+  + mounting TBD - this comes with its own metal pole and wind speed/direction sensors on top, and an arm attached to the side for its rain gauge.
 - Particulate matter
-  + SPS30
-  + SDS011
+  + SPS30 - seems to be better for PM2.5 (less susceptible to high humidity), but only measures PM1.0 and PM2.5, the PM10.0 readings it gives are just estimates and absolutely useless. A bit more expensive. Needs 5V input voltage (but communication can be either 5 or 3.3V).
+  + SDS011 - this has been used for years. Pretty good and affordable, but it has its weaknesses - like massively overestimating PM-values when humidity is high. Measures PM2.5 and PM10.0. Needs 5V input voltage (but serial communication is still at 3.3V).
+  + in the end, both sensors will be off by quite a bit, but in different ways
+  + interesting evaluation in https://amt.copernicus.org/articles/13/2413/2020/
 - Radiation
   + no idea yet. And more of a joke than a real sensor.
 
-== Mainboard
+## Mainboard
 
-Olimex ESP32-POE-ISO. Fox has a revision B board lying around.
+We'll use an Olimex ESP32-POE-ISO.
+Fox has a revision B board lying around.
 
 This allows us to either:
 - Power and network through POE
