@@ -1,10 +1,4 @@
-/* Ethernet Basic Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
+/* ZAMDACH2022 main "app"
 */
 #include <stdio.h>
 #include <string.h>
@@ -12,12 +6,16 @@
 #include "freertos/task.h"
 #include "esp_netif.h"
 #include "esp_eth.h"
+#include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "math.h"
+#include "nvs_flash.h"
+#include "time.h"
 #include "sdkconfig.h"
+#include "secrets.h"
 
 static const char *TAG = "zamdach2022";
 
@@ -55,6 +53,7 @@ double reducedairpressurecalc(double press)
   return (press / pow((1 - (altitude * 0.0000225577)), 5.25588));
 }
 
+#ifndef CONFIG_ZAMDACH_USEWIFI
 /** Event handler for Ethernet events */
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
                               int32_t event_id, void *event_data)
@@ -83,24 +82,56 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         break;
     }
 }
+#endif /* !CONFIG_ZAMDACH_USEWIFI */
 
-/** Event handler for IP_EVENT_ETH_GOT_IP */
+#ifdef CONFIG_ZAMDACH_USEWIFI
+/** Event handler for WiFi events */
+time_t lastwifireconnect = 0;
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    wifi_event_sta_connected_t * ev_co = (wifi_event_sta_connected_t *)event_data;
+    wifi_event_sta_disconnected_t * ev_dc = (wifi_event_sta_disconnected_t *)event_data;
+    switch (event_id) {
+        case WIFI_EVENT_STA_CONNECTED:
+            ESP_LOGI(TAG, "WiFi Connected: channel %u bssid %02x%02x%02x%02x%02x%02x",
+                           ev_co->channel, ev_co->bssid[0], ev_co->bssid[1], ev_co->bssid[2],
+                           ev_co->bssid[3], ev_co->bssid[4], ev_co->bssid[5]);
+            break;
+        case WIFI_EVENT_STA_DISCONNECTED:
+            ESP_LOGI(TAG, "WiFi Disconnected: reason %u", ev_dc->reason);
+            if ((lastwifireconnect == 0)
+             || ((time(NULL) - lastwifireconnect) > 5)) {
+              /* Last reconnect attempt more than 5 seconds ago - try it again */
+              ESP_LOGI(TAG, "Attempting WiFi reconnect");
+              lastwifireconnect = time(NULL);
+              esp_wifi_connect();
+            }
+            break;
+        default: break;
+    }
+}
+#endif /* CONFIG_ZAMDACH_USEWIFI */
+
+/** Event handler for IP_EVENT_(ETH|STA)_GOT_IP */
 static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
                                  int32_t event_id, void *event_data)
 {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
     const esp_netif_ip_info_t *ip_info = &event->ip_info;
 
-    ESP_LOGI(TAG, "Ethernet Got IP Address");
+    ESP_LOGI(TAG, "We got an IP address!");
     ESP_LOGI(TAG, "~~~~~~~~~~~");
-    ESP_LOGI(TAG, "ETHIP:" IPSTR, IP2STR(&ip_info->ip));
-    ESP_LOGI(TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    ESP_LOGI(TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
+    ESP_LOGI(TAG, "IP:     " IPSTR, IP2STR(&ip_info->ip));
+    ESP_LOGI(TAG, "NETMASK:" IPSTR, IP2STR(&ip_info->netmask));
+    ESP_LOGI(TAG, "GW:     " IPSTR, IP2STR(&ip_info->gw));
     ESP_LOGI(TAG, "~~~~~~~~~~~");
 }
 
 void app_main(void)
 {
+    /* WiFi does not work without this because... who knows, who cares. */
+    nvs_flash_init();
     // Initialize TCP/IP network interface (should be called only once in application)
     ESP_ERROR_CHECK(esp_netif_init());
     // Create default event loop that running in background
@@ -121,9 +152,30 @@ void app_main(void)
         ESP_LOGI(TAG, "I2C master port 0 initialized");
     }
 
+#ifdef CONFIG_ZAMDACH_USEWIFI
+    esp_netif_create_default_wifi_sta(); /* This seems to return a completely useless structure */
+    /* esp_netif_t * mainnetif = esp_netif_new(nicfg); */
+    wifi_init_config_t wicfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wicfg));
+    // Register user defined event handers
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &got_ip_event_handler, NULL));
+
+    wifi_config_t wccfg = {
+      .sta = {
+        .ssid = CONFIG_ZAMDACH_WIFISSID,
+        .password = ZAMDACH_WIFIPASSWORD,
+        .threshold.authmode = WIFI_AUTH_WPA2_PSK
+      }
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wccfg));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_connect());
+#else /* !CONFIG_ZAMDACH_USEWIFI - we use ethernet */
     // Create new default instance of esp-netif for Ethernet
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
-    esp_netif_t *eth_netif = esp_netif_new(&cfg);
+    esp_netif_config_t nicfg = ESP_NETIF_DEFAULT_ETH();
+    esp_netif_t * mainnetif = esp_netif_new(&nicfg);
 
     // Init MAC and PHY configs to default
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
@@ -147,7 +199,7 @@ void app_main(void)
     esp_eth_handle_t eth_handle = NULL;
     ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
     /* attach Ethernet driver to TCP/IP stack */
-    ESP_ERROR_CHECK(esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handle)));
+    ESP_ERROR_CHECK(esp_netif_attach(mainnetif, esp_eth_new_netif_glue(eth_handle)));
 
     // Register user defined event handers
     ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
@@ -155,6 +207,7 @@ void app_main(void)
 
     /* start Ethernet driver state machine */
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
+#endif /* !CONFIG_ZAMDACH_USEWIFI */
 
     /* Configure the LPS25HB */
     /* CTRL_REG1 0x20: Power on/Enable, 1 Hz */
@@ -162,15 +215,13 @@ void app_main(void)
 
     vTaskDelay(pdMS_TO_TICKS(1111));
 
-    uint8_t prh = 0, prl = 0, prxl = 0;
+    uint8_t prr[3];
     int lpshadreaderr = 0;
-    if (lps25hb_register_read(0x2a, &prh, 1) != ESP_OK) { lpshadreaderr = 1; }
-    if (lps25hb_register_read(0x29, &prl, 1) != ESP_OK) { lpshadreaderr = 1; }
-    if (lps25hb_register_read(0x28, &prxl, 1) != ESP_OK) { lpshadreaderr = 1; }
-    ESP_LOGI(TAG, "LPS25HB read - err %d values %02x%02x%02x", lpshadreaderr, prh, prl, prxl);
-    double press = (((uint32_t)prh  << 16)
-                  + ((uint32_t)prl  <<  8)
-                  + ((uint32_t)prxl <<  0)) / 4096.0;
+    if (lps25hb_register_read(0x80 | 0x28, &prr[0], 3) != ESP_OK) { lpshadreaderr = 1; }
+    ESP_LOGI(TAG, "LPS25HB read - err %d values %02x%02x%02x", lpshadreaderr, prr[0], prr[1], prr[2]);
+    double press = (((uint32_t)prr[2]  << 16)
+                  + ((uint32_t)prr[1]  <<  8)
+                  + ((uint32_t)prr[0]  <<  0)) / 4096.0;
     ESP_LOGI(TAG, "That converts to a measured pressure of %.3f hPa, or a calculated pressure of %.3f hPa at sea level.",
                   press, reducedairpressurecalc(press));
 }

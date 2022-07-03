@@ -6,15 +6,16 @@
 - Sunlight
   + MAX44009 Ambient Light sensor (up to 188000 lux)
   + TSL2591 (up to 88000 lux) (in contrast to most others this seems to actually be available)
+  + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
   + Whatever sensor we chose, this will need to be directly exposed to the sunlight.
 - Pressure
   + LPS25HB
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
-  + SHT31 / SHT35. SHT35 is probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
+  + SHT31 / SHT35 / SHT40. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
 - Rain
   + RG15 optical sensor
-  + will need to be mounted on a metal arm on its own
+  + will need to be mounted on a metal arm on its own, needs direct sky access
   + there is also a rain gauge on the Sparkfun weather meter kit - but that will probably not last long. We could still connect it up.
 - Wind speed/direction
   + Sparkfun Weather meter kit https://learn.sparkfun.com/tutorials/weather-meter-hookup-guide/all
