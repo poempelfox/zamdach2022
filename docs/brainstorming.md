@@ -7,7 +7,8 @@
   + MAX44009 Ambient Light sensor (up to 188000 lux)
   + TSL2591 (up to 88000 lux) (in contrast to most others this seems to actually be available)
   + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
-  + Whatever sensor we chose, this will need to be directly exposed to the sunlight.
+  + we'll now use TSL2591 for light and LTR390 for UV sensing.
+  + This will need to be directly exposed to the sunlight. We'll need to put it under some sort of protective covering, figure out how much light/UV that absorbs, and then correct the measured values accordingly.
 - Pressure
   + LPS25HB
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
