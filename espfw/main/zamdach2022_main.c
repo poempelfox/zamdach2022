@@ -9,6 +9,8 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_http_client.h"
+#include "esp_system.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "math.h"
@@ -18,6 +20,8 @@
 #include "secrets.h"
 
 static const char *TAG = "zamdach2022";
+
+char chipid[30] = "ZAMDACH-UNSET";
 
 #define I2C_MASTER_TIMEOUT_MS 1000  /* Timeout for I2C communication */
 #define LPS25HBADDR 0x5c  /* That is hardwired on our breakout board */
@@ -132,6 +136,18 @@ void app_main(void)
 {
     /* WiFi does not work without this because... who knows, who cares. */
     nvs_flash_init();
+    /* Get our ChipID */
+    {
+      uint8_t mainmac[6];
+      if (esp_efuse_mac_get_custom(mainmac) != ESP_OK) {
+        /* No custom MAC in EFUSE3, use default MAC */
+        esp_read_mac(mainmac, ESP_MAC_WIFI_STA);
+      }
+      sprintf(chipid, "ZAMDACH-%02x%02x%02x%02x%02x%02x",
+                      mainmac[0], mainmac[1], mainmac[2],
+                      mainmac[3], mainmac[4], mainmac[5]);
+      ESP_LOGI(TAG, "My Chip-ID: %s", chipid);
+    }
     // Initialize TCP/IP network interface (should be called only once in application)
     ESP_ERROR_CHECK(esp_netif_init());
     // Create default event loop that running in background
@@ -213,6 +229,7 @@ void app_main(void)
     /* CTRL_REG1 0x20: Power on/Enable, 1 Hz */
     lps25hb_register_write_byte(0x20, (0x80 | 0x40));
 
+    /* Measurement takes 1 second, so delay for slightly more than that */
     vTaskDelay(pdMS_TO_TICKS(1111));
 
     uint8_t prr[3];
@@ -224,5 +241,28 @@ void app_main(void)
                   + ((uint32_t)prr[0]  <<  0)) / 4096.0;
     ESP_LOGI(TAG, "That converts to a measured pressure of %.3f hPa, or a calculated pressure of %.3f hPa at sea level.",
                   press, reducedairpressurecalc(press));
+    
+    /* Send HTTP POST to wetter.poempelfox.de */
+    char post_data[300];
+    sprintf(post_data, "{\n\"software_version\":\"0.1\",\n\"sensordatavalues\":[{\"value_type\":\"pressure\",\"value\":\"%.3f\"}]}", press);
+    esp_http_client_config_t httpcc = {
+      .url = "http://wetter.poempelfox.de/api/pushmeasurement",
+      .method = HTTP_METHOD_POST,
+      .user_agent = "ZAMDACH2022/0.1 (ESP32)"
+    };
+    esp_http_client_handle_t httpcl = esp_http_client_init(&httpcc);
+    esp_http_client_set_header(httpcl, "Content-Type", "application/json");
+    esp_http_client_set_header(httpcl, "X-Pin", "1");
+    esp_http_client_set_header(httpcl, "X-Sensor", chipid);
+    esp_http_client_set_post_field(httpcl, post_data, strlen(post_data));
+    esp_err_t err = esp_http_client_perform(httpcl);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %d",
+                      esp_http_client_get_status_code(httpcl),
+                      esp_http_client_get_content_length(httpcl));
+    } else {
+        ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+    }
+    esp_http_client_cleanup(httpcl);
 }
 
