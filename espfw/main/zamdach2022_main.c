@@ -252,8 +252,8 @@ void app_main(void)
     };
     esp_http_client_handle_t httpcl = esp_http_client_init(&httpcc);
     esp_http_client_set_header(httpcl, "Content-Type", "application/json");
-    esp_http_client_set_header(httpcl, "X-Pin", "1");
-    esp_http_client_set_header(httpcl, "X-Sensor", chipid);
+    esp_http_client_set_header(httpcl, "X-Pin", CONFIG_ZAMDACH_WPDSID_PRESSURE);
+    esp_http_client_set_header(httpcl, "X-Sensor", ZAMDACH_WPDTOKEN);
     esp_http_client_set_post_field(httpcl, post_data, strlen(post_data));
     esp_err_t err = esp_http_client_perform(httpcl);
     if (err == ESP_OK) {

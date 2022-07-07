@@ -12,11 +12,19 @@ menu "ZAMDACH2022 Configuration"
     if ZAMDACH_USEWIFI
         config ZAMDACH_WIFISSID
             string "WiFi SSID to connect to"
-            default ZAM
+            default "ZAM"
             help
                 Sets the SSID to which we try to connect.
-                Do not forget to set the secret (password) as well.
+                Do not forget to set the secret (password) as well,
+                you need to do that in secrets.h, not here.
 
     endif # ZAMDACH_USEWIFI
+
+    config ZAMDACH_WPDSID_PRESSURE
+        string "wetter.p.d ID for the pressure sensor"
+        default "13"
+        help
+            The ID of the pressure sensor for reporting
+            to wetter.poempelfox.de
 
 endmenu
