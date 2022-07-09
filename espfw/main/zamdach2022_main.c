@@ -18,30 +18,13 @@
 #include "time.h"
 #include "sdkconfig.h"
 #include "secrets.h"
+#include "lps25hb.h"
 
 static const char *TAG = "zamdach2022";
 
 char chipid[30] = "ZAMDACH-UNSET";
 
 #define I2C_MASTER_TIMEOUT_MS 1000  /* Timeout for I2C communication */
-#define LPS25HBADDR 0x5c  /* That is hardwired on our breakout board */
-
-static esp_err_t lps25hb_register_read(uint8_t reg_addr, uint8_t *data, size_t len)
-{
-    return i2c_master_write_read_device(0, LPS25HBADDR, &reg_addr, 1, data, len,
-                                           I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-}
-
-static esp_err_t lps25hb_register_write_byte(uint8_t reg_addr, uint8_t data)
-{
-    int ret;
-    uint8_t write_buf[2] = {reg_addr, data};
-
-    ret = i2c_master_write_to_device(0, LPS25HBADDR, write_buf, sizeof(write_buf),
-                                        I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-
-    return ret;
-}
 
 double reducedairpressurecalc(double press)
 {
@@ -225,22 +208,15 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 #endif /* !CONFIG_ZAMDACH_USEWIFI */
 
-    /* Configure the LPS25HB */
-    /* CTRL_REG1 0x20: Power on/Enable, 1 Hz */
-    lps25hb_register_write_byte(0x20, (0x80 | 0x40));
-
+    lps25hb_init(0);
     /* Measurement takes 1 second, so delay for slightly more than that */
     vTaskDelay(pdMS_TO_TICKS(1111));
 
-    uint8_t prr[3];
-    int lpshadreaderr = 0;
-    if (lps25hb_register_read(0x80 | 0x28, &prr[0], 3) != ESP_OK) { lpshadreaderr = 1; }
-    ESP_LOGI(TAG, "LPS25HB read - err %d values %02x%02x%02x", lpshadreaderr, prr[0], prr[1], prr[2]);
-    double press = (((uint32_t)prr[2]  << 16)
-                  + ((uint32_t)prr[1]  <<  8)
-                  + ((uint32_t)prr[0]  <<  0)) / 4096.0;
-    ESP_LOGI(TAG, "That converts to a measured pressure of %.3f hPa, or a calculated pressure of %.3f hPa at sea level.",
-                  press, reducedairpressurecalc(press));
+    double press = lps25hb_readpressure();
+    if (press > 0) {
+      ESP_LOGI(TAG, "That converts to a measured pressure of %.3f hPa, or a calculated pressure of %.3f hPa at sea level.",
+                    press, reducedairpressurecalc(press));
+    }
     
     /* Send HTTP POST to wetter.poempelfox.de */
     char post_data[300];
