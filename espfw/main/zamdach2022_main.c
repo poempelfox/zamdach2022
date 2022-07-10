@@ -12,6 +12,7 @@
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
+#include "driver/uart.h"
 #include "math.h"
 #include "nvs_flash.h"
 #include "time.h"
@@ -208,6 +209,25 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 #endif /* !CONFIG_ZAMDACH_USEWIFI */
 
+    uart_config_t rainsens_serial_config = {
+      .baud_rate = 9600,
+      .data_bits = UART_DATA_8_BITS,
+      .parity = UART_PARITY_DISABLE,
+      .stop_bits = UART_STOP_BITS_1,
+      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    };
+    // Configure UART parameters - we're using UART1.
+    QueueHandle_t rainsens_comm_handle;
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, 512, 512, 5, &rainsens_comm_handle, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &rainsens_serial_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, 4, 36, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    /* Tell the rainsensor we want polling mode, a.k.a. "shut up until you're spoken to".
+     * Also, use high res mode and metrical output. */
+    uart_write_bytes(UART_NUM_1, "P\nH\nM\n", 6);
+    uart_wait_tx_done(UART_NUM_1, 200);
+    /* Now request the first reading. */
+    uart_write_bytes(UART_NUM_1, "R\n", 2);
+
     lps25hb_init(0);
     /* Measurement takes 1 second, so delay for slightly more than that */
     vTaskDelay(pdMS_TO_TICKS(1111));
@@ -220,5 +240,15 @@ void app_main(void)
       submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PRESSURE, "pressure", press);
     }
 
+    uint8_t rcvdata[128];
+    int length = 0;
+    ESP_ERROR_CHECK(uart_get_buffered_data_len(UART_NUM_1, (size_t*)&length));
+    length = uart_read_bytes(UART_NUM_1, rcvdata, length, 100);
+    if (length >= 0) {
+      rcvdata[length] = 0;
+      ESP_LOGI(TAG, "Serial received %d bytes: %s\n", length, rcvdata);
+    } else {
+      ESP_LOGI(TAG, "Received error from serial port.\n");
+    }
 }
 
