@@ -166,9 +166,9 @@ void network_prepare(void)
 
     mac_config.smi_mdc_gpio_num = 23; /* ESP32-POE-ISO */
     mac_config.smi_mdio_gpio_num = 18; /* ESP32-POE-ISO */
-    esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&mac_config);
-    esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
-    esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
+    esp_eth_mac_t * ethmac = esp_eth_mac_new_esp32(&mac_config);
+    esp_eth_phy_t * ethphy = esp_eth_phy_new_lan87xx(&phy_config);
+    esp_eth_config_t config = ETH_DEFAULT_CONFIG(ethmac, ethphy);
     esp_eth_handle_t eth_handle = NULL;
     ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
     /* attach Ethernet driver to TCP/IP stack */
@@ -279,13 +279,18 @@ void app_main(void)
         }
 
         network_off();
-        long howmuchtosleep = (lastmeasts + 60) - time(NULL);
+        long howmuchtosleep = (lastmeasts + 60) - time(NULL) - 1;
+#ifdef CONFIG_ZAMDACH_USEWIFI
         ESP_LOGI(TAG, "will now enter sleep mode for %ld seconds", howmuchtosleep);
         if (howmuchtosleep > 0) {
           /* This is given in microseconds */
           esp_sleep_enable_timer_wakeup(howmuchtosleep * (int64_t)1000000);
           esp_light_sleep_start();
         }
+#else /* !CONFIG_ZAMDACH_USEWIFI - we use Ethernet */
+        ESP_LOGI(TAG, "will now wait for %ld seconds (no sleep with POE)", howmuchtosleep);
+        vTaskDelay(pdMS_TO_TICKS(howmuchtosleep * 1000));
+#endif /* !CONFIG_ZAMDACH_USEWIFI */
       } else { // Delay for a short time
         vTaskDelay(pdMS_TO_TICKS(1000));
       }
