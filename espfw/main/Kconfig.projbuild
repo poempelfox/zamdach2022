@@ -27,4 +27,11 @@ menu "ZAMDACH2022 Configuration"
             The ID of the pressure sensor for reporting
             to wetter.poempelfox.de
 
+    config ZAMDACH_WPDSID_RAINGAUGE1
+        string "wetter.p.d ID for the RG15 raingauge"
+        default "14"
+        help
+            The ID of the RG15 raingauge sensor for reporting
+            to wetter.poempelfox.de
+
 endmenu
