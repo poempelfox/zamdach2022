@@ -13,7 +13,7 @@
   + LPS25HB
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
-  + SHT31 / SHT35 / SHT40. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
+  + SHT31 / SHT35 / SHT40 / SHT41 / SHT45. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
 - Rain
   + RG15 optical sensor
   + will need to be mounted on a metal arm on its own, needs direct sky access
@@ -26,6 +26,7 @@
   + SDS011 - this has been used for years. Pretty good and affordable, but it has its weaknesses - like massively overestimating PM-values when humidity is high. Measures PM2.5 and PM10.0. Needs 5V input voltage (but serial communication is still at 3.3V).
   + in the end, both sensors will be off by quite a bit, but in different ways
   + interesting evaluation in https://amt.copernicus.org/articles/13/2413/2020/
+  + there seems to be a relatively new SEN50 that might be a very good alternative - if it can be sourced.
 - Radiation
   + no idea yet. And more of a joke than a real sensor.
 
