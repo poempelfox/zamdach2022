@@ -17,9 +17,10 @@
 #include "sdkconfig.h"
 #include "secrets.h"
 #include "lps25hb.h"
-#include "rg15.h"
 #include "network.h"
+#include "rg15.h"
 #include "submit.h"
+#include "windsens.h"
 
 static const char *TAG = "zamdach2022";
 
@@ -45,6 +46,10 @@ double reducedairpressurecalc(double press)
 void app_main(void)
 {
     time_t lastmeasts = 0;
+    /* Initialize the windsensor. This includes initializing the ULP
+     * Co-processor, we let it count the number of signals received
+     * from the windsensor / aenometer. */
+    ws_init();
     /* WiFi does not work without this because... who knows, who cares. */
     nvs_flash_init();
     /* Get our ChipID */
@@ -59,6 +64,7 @@ void app_main(void)
                       mainmac[3], mainmac[4], mainmac[5]);
       ESP_LOGI(TAG, "My Chip-ID: %s", chipid);
     }
+
     // Initialize TCP/IP network interface (should be called only once in application)
     ESP_ERROR_CHECK(esp_netif_init());
     // Create default event loop that running in background
@@ -95,6 +101,10 @@ void app_main(void)
         rg15_requestread();
 
         network_on(); /* Turn network on, i.e. connect to WiFi */
+
+        /* FIXME this does not belong here at all, just for testing */
+        uint16_t wsctr = ws_readaenometer();
+        ESP_LOGI(TAG, "Current counter from ULP counting is: %d", wsctr);
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
