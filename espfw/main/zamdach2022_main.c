@@ -16,6 +16,7 @@
 #include "time.h"
 #include "sdkconfig.h"
 #include "secrets.h"
+#include "i2c.h"
 #include "lps25hb.h"
 #include "network.h"
 #include "rg15.h"
@@ -69,21 +70,9 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     // Create default event loop that running in background
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    i2c_config_t i2cp0conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = 13,  /* GPIO13 */
-        .scl_io_num = 16,  /* GPIO16 */
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 250000, /* There is really no need to hurry */
-    };
-    i2c_param_config(0, &i2cp0conf);
-    if (i2c_driver_install(0, i2cp0conf.mode, 0, 0, 0) != ESP_OK) {
-        ESP_LOGI(TAG, "Oh dear: I2C-Init for Port 0 failed.");
-    } else {
-        ESP_LOGI(TAG, "I2C master port 0 initialized");
-    }
+    
+    /* Configure our (2) I2C-ports */
+    i2cport_init();
 
     network_prepare();
 
