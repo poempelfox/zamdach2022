@@ -7,16 +7,16 @@
   + MAX44009 Ambient Light sensor (up to 188000 lux)
   + TSL2591 (up to 88000 lux) (in contrast to most others this seems to actually be available)
   + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
-  + we'll now use TSL2591 for light and LTR390 for UV sensing.
+  + we'll now use **TSL2591** for light and **LTR390** for UV sensing.
   + This will need to be directly exposed to the sunlight. We'll need to put it under some sort of protective covering, figure out how much light/UV that absorbs, and then correct the measured values accordingly.
 - Pressure
-  + LPS25HB
+  + **LPS25HB**
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
   + SHT31 / SHT35 / SHT40 / SHT41 / SHT45. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
   + we'll now use a SHT40 or SHT41.
 - Rain
-  + RG15 optical sensor
+  + **RG15** optical sensor
   + will need to be mounted on a metal arm on its own, needs direct sky access
   + there is also a rain gauge on the Sparkfun weather meter kit - but that will probably not last long. We could still connect it up.
 - Wind speed/direction
@@ -28,7 +28,7 @@
   + in the end, both sensors will be off by quite a bit, but in different ways
   + interesting evaluation in https://amt.copernicus.org/articles/13/2413/2020/
   + there seems to be a relatively new SEN50 that might be a very good alternative, but it also only actually measures PM2.5, and calculates PM10.0 "based on distribution profile of all measured particles", whatever that means.
-  + we'll now use a SEN50.
+  + we'll now use a **SEN50**.
 - Radiation
   + this will be a seperate sensor-project. The risk of the high voltage stuff required for the Geiger-Mueller-Tube damaging the rest, e.g. if stuff gets wet, is just too high.
 
@@ -52,15 +52,43 @@ This is the planned GPIO / pin usage:
 
 | Pin  | Use |
 | ---  | --- |
-| GPI34 == RTC_GPIO4 | Aenometer (wind speed sensor). Note that this is also connected to the button BUT1 on the board, so the button can be used for testing. |
-| GPI35 == ADC1_CH7 | wind vane (wind direction sensor). Needs external voltage divider and stuff. |
-| GPIO13 | I2C-bus A SDA |
-| GPIO16 | I2C-bus A SCL |
-| GPIO4 == UART1_TX | RG15 rain sensor |
-| GPI36 == UART1_RX | RG15 rain sensor |
-| ? | I2C-bus B SDA |
-| ? | I2C-bus B SCL |
+| `GPI34` == `RTC_GPIO4` | Aenometer (wind speed sensor). Note that this is also connected to the button `BUT1` on the board, so the button can be used for testing. |
+| `GPI35` == `ADC1_CH7` | wind vane (wind direction sensor). Needs external voltage divider and stuff. |
+| `GPIO13` | I2C-bus A SDA |
+| `GPIO16` | I2C-bus A SCL |
+| `GPIO4` == `UART1_TX` | RG15 rain sensor |
+| `GPI36` == `UART1_RX` | RG15 rain sensor |
+| `GPIO14` | I2C-bus B SDA |
+| `GPIO15` | I2C-bus B SCL |
 
 We have not decided how to distribute all the I2C devices onto the two I2C buses yet.
 (The reason that there are exactly two I2C buses is that this is what the ESP32 can do in hardware.)
+
+The wind direction sensor needs to be wired up like this:
+```
+  3.3V
+   |
+  | |  resistor 22000 Ohm
+   |
+   |- `GPI35`
+   |
+windsensor-RJ11 Pin 1[^1]
+
+
+windsensor-RJ11 Pin 4[^1]
+   |
+   |
+  GND
+```
+
+The wind speed sensor needs to be wired up as follows:
+- Connect windsensor-RJ11 Pin 2[^1] to `GPI34`
+- Connect windsensor-RJ11 Pin 3[^1] to `GND`
+There is no need for an external pullup-resistor, because there is a
+10k resistor on the mainboard pulling `GPI34` high.
+
+[^1]: Note that the windsensor-RJ11-connection can be mirrored without
+      any effect, as it's only connecting to switches or resistors, and
+      the pinout of the RJ11 is symmetrical - the inner pins are the
+      speed sensor, the outer pins are the direction sensors.
 
