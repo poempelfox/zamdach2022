@@ -10,7 +10,6 @@
 #include "esp_system.h"
 #include "esp_sleep.h"
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "math.h"
 #include "nvs_flash.h"
 #include "time.h"
@@ -93,7 +92,9 @@ void app_main(void)
 
         /* FIXME this does not belong here at all, just for testing */
         uint16_t wsctr = ws_readaenometer();
-        ESP_LOGI(TAG, "Current counter from ULP counting is: %d", wsctr);
+        uint8_t wdv = ws_readwinddirection();
+        ESP_LOGI(TAG, "Current counter from ULP counting is: %u ; wind direction: %u",
+                      wsctr, wdv);
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
