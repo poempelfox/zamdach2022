@@ -52,7 +52,8 @@ This is the planned GPIO / pin usage:
 
 | Pin  | Use |
 | ---  | --- |
-| GPI34 == RTC_GPIO4 | Aenometer (wind sensor) |
+| GPI34 == RTC_GPIO4 | Aenometer (wind speed sensor). Note that this is also connected to the button BUT1 on the board, so the button can be used for testing. |
+| GPI35 == ADC1_CH7 | wind vane (wind direction sensor). Needs external voltage divider and stuff. |
 | GPIO13 | I2C-bus A SDA |
 | GPIO16 | I2C-bus A SCL |
 | GPIO4 == UART1_TX | RG15 rain sensor |
