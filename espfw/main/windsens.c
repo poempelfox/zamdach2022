@@ -24,7 +24,8 @@ extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
  * (lets ignore the fact that this would fry the controller.)
  * Our input voltage however is 3.3V, so we need to scale this down.
  * The maximum we should see therefore is 3466. */
-#define VDCALC(r) (uint16_t)((r * 3466UL) / (r + OTHERRESISTOR))
+#define MAXADCVAL 3466UL
+#define VDCALC(r) (uint16_t)((r * MAXADCVAL) / (r + OTHERRESISTOR))
 /* Table of resistor values from sensor datasheet */
 static const uint16_t voltagemappingtable[16] = {
   VDCALC( 33000), /*    0.0 deg  0 */
@@ -79,6 +80,12 @@ uint8_t ws_readwinddirection(void)
     uint8_t res = 99;
     uint16_t mindiff = 0xffff;
     int v = adc1_get_raw(WDADCPORT);
+    /* There is one special case: If voltage is ABOVE the expected
+     * maximum, we don't really care about distance anymore, then it
+     * has to be the biggest resistor. */
+    if (v > MAXADCVAL) {
+      return 12;  /* The biggest is the 120k Ohm for position 12 */
+    }
     for (int i = 0; i < 16; i++) {
       if (abs((int)v - (int)voltagemappingtable[i]) < mindiff) {
         mindiff = (uint16_t)abs((int)v - (int)voltagemappingtable[i]);
