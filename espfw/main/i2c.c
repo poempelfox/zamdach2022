@@ -28,7 +28,7 @@ void i2cport_init(void)
         .master.clk_speed = 100000, /* There is really no need to hurry */
     };
     i2c_param_config(1, &i2cp1conf);
-    if (i2c_driver_install(0, i2cp1conf.mode, 0, 0, 0) != ESP_OK) {
+    if (i2c_driver_install(1, i2cp1conf.mode, 0, 0, 0) != ESP_OK) {
         ESP_LOGI("zamdach-i2c.c", "Oh dear: I2C-Init for Port 1 failed.");
     } else {
         ESP_LOGI("zamdach-i2c.c", "I2C master port 1 initialized");
