@@ -20,6 +20,13 @@ menu "ZAMDACH2022 Configuration"
 
     endif # ZAMDACH_USEWIFI
 
+    config ZAMDACH_WPDSID_HUMIDITY
+        string "wetter.p.d ID for the humidity sensor"
+        default "19"
+        help
+            The ID of the humidity sensor for reporting
+            to wetter.poempelfox.de
+
     config ZAMDACH_WPDSID_PRESSURE
         string "wetter.p.d ID for the pressure sensor"
         default "13"
@@ -32,6 +39,34 @@ menu "ZAMDACH2022 Configuration"
         default "14"
         help
             The ID of the RG15 raingauge sensor for reporting
+            to wetter.poempelfox.de
+
+    config ZAMDACH_WPDSID_TEMPERATURE
+        string "wetter.p.d ID for the temperature sensor"
+        default "20"
+        help
+            The ID of the temperature sensor for reporting
+            to wetter.poempelfox.de
+
+    config ZAMDACH_WPDSID_UV
+        string "wetter.p.d ID for the UV sensor"
+        default "21"
+        help
+            The ID of the UV sensor for reporting
+            to wetter.poempelfox.de
+
+    config ZAMDACH_WPDSID_WINDDIR
+        string "wetter.p.d ID for the wind vane (wind direction)"
+        default "22"
+        help
+            The ID of the wind vane (wind direction) sensor for reporting
+            to wetter.poempelfox.de
+
+    config ZAMDACH_WPDSID_WINDSPEED
+        string "wetter.p.d ID for the aenometer (wind speed)"
+        default "23"
+        help
+            The ID of the aenometer (wind speed) sensor for reporting
             to wetter.poempelfox.de
 
 endmenu

@@ -132,26 +132,26 @@ void app_main(void)
           /* calculate Wind Speed in km/h from the number of impulses and the timestamp difference */
           float windspeed = 2.4 * wsctr / tsdif;
           ESP_LOGI(TAG, "Wind speed: %.1f km/h", windspeed);
-          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, "windspeed", windspeed); */
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, "windspeed", windspeed);
         }
         lastaenomread = curaenomread;
 
         if (wsdir < 16) { /* Only Range 0-15 is valid */
           char * winddirmap[16] = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
           ESP_LOGI(TAG, "Wind direction: %d (%s)", wsdir, winddirmap[wsdir]);
-          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDDIR, "winddirection", (float)wsdir); */
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDDIR, "winddirection", (float)wsdir * 22.5);
         }
 
         if (temphum.valid > 0) {
           ESP_LOGI(TAG, "Temperature: %.2f degC (raw: %x)", temphum.temp, temphum.tempraw);
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
-          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp); */
-          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum); */
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum);
         }
 
         if (uvind >= 0.0) {
           ESP_LOGI(TAG, "UV-Index: %.2f", uvind);
-          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UVINDEX, "uvindex", uvind); */
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UV, "uv", uvind);
         }
 
         network_off();
