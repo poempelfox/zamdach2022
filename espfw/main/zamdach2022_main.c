@@ -17,8 +17,10 @@
 #include "secrets.h"
 #include "i2c.h"
 #include "lps25hb.h"
+#include "ltr390.h"
 #include "network.h"
 #include "rg15.h"
+#include "sht4x.h"
 #include "submit.h"
 #include "windsens.h"
 
@@ -46,6 +48,7 @@ double reducedairpressurecalc(double press)
 void app_main(void)
 {
     time_t lastmeasts = 0;
+    time_t lastaenomread = 0;
     /* Initialize the windsensor. This includes initializing the ULP
      * Co-processor, we let it count the number of signals received
      * from the windsensor / aenometer. */
@@ -75,8 +78,10 @@ void app_main(void)
 
     network_prepare();
 
-    lps25hb_init(0);
+    lps25hb_init(1);
+    ltr390_init(1);
     rg15_init();
+    sht4x_init(1);
     vTaskDelay(pdMS_TO_TICKS(3000)); // Mainly to give the RG15 time to
     // process our initialization sequence.
 
@@ -87,20 +92,22 @@ void app_main(void)
 
         /* Request update from the sensors that don't autoupdate all the time */
         rg15_requestread();
+        sht4x_startmeas();
 
         network_on(); /* Turn network on, i.e. connect to WiFi */
-
-        /* FIXME this does not belong here at all, just for testing */
-        uint16_t wsctr = ws_readaenometer();
-        uint8_t wdv = ws_readwinddirection();
-        ESP_LOGI(TAG, "Current counter from ULP counting is: %u ; wind direction: %u",
-                      wsctr, wdv);
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
         /* Read all the sensors */
         float press = lps25hb_readpressure();
+        float uvind = ltr390_readuv();
         float raing = rg15_readraincount();
+        uint16_t wsctr = ws_readaenometer();
+        /* We'll need this extra timestamp to calculate windspeed from number of pulses */
+        time_t curaenomread = time(NULL);
+        uint8_t wsdir = ws_readwinddirection();
+        struct sht4xdata temphum;
+        sht4x_read(&temphum);
 
         /* potentially wait for up to 4 more seconds if we haven't got an
          * IP address yet */
@@ -117,6 +124,34 @@ void app_main(void)
         if (raing > -0.1) {
           ESP_LOGI(TAG, "Rain: %.3f mm", raing);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_RAINGAUGE1, "precipitation", raing);
+        }
+
+        if (lastaenomread != 0) { /* Ignore the first read on startup, but other */
+          /* than that, we really have no way of telling if a reading is valid or not */
+          int tsdif = curaenomread - lastaenomread;
+          /* calculate Wind Speed in km/h from the number of impulses and the timestamp difference */
+          float windspeed = 2.4 * wsctr / tsdif;
+          ESP_LOGI(TAG, "Wind speed: %.1f km/h", windspeed);
+          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, "windspeed", windspeed); */
+        }
+        lastaenomread = curaenomread;
+
+        if (wsdir < 16) { /* Only Range 0-15 is valid */
+          char * winddirmap[16] = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+          ESP_LOGI(TAG, "Wind direction: %d (%s)", wsdir, winddirmap[wsdir]);
+          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDDIR, "winddirection", (float)wsdir); */
+        }
+
+        if (temphum.valid > 0) {
+          ESP_LOGI(TAG, "Temperature: %.2f degC (raw: %x)", temphum.temp, temphum.tempraw);
+          ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
+          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp); */
+          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum); */
+        }
+
+        if (uvind >= 0.0) {
+          ESP_LOGI(TAG, "UV-Index: %.2f", uvind);
+          /* FIXME submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UVINDEX, "uvindex", uvind); */
         }
 
         network_off();
