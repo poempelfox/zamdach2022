@@ -20,6 +20,7 @@
 #include "ltr390.h"
 #include "network.h"
 #include "rg15.h"
+#include "sen50.h"
 #include "sht4x.h"
 #include "submit.h"
 #include "windsens.h"
@@ -28,7 +29,7 @@ static const char *TAG = "zamdach2022";
 
 char chipid[30] = "ZAMDACH-UNSET";
 
-#define I2C_MASTER_TIMEOUT_MS 1000  /* Timeout for I2C communication */
+#define I2C_MASTER_TIMEOUT_MS 100  /* Timeout for I2C communication */
 
 double reducedairpressurecalc(double press)
 {
@@ -81,6 +82,8 @@ void app_main(void)
     lps25hb_init(1);
     ltr390_init(1);
     rg15_init();
+    sen50_init(0);
+    sen50_startmeas(); /* FIXME Perhaps we don't want this on all the time. */
     sht4x_init(1);
     vTaskDelay(pdMS_TO_TICKS(3000)); // Mainly to give the RG15 time to
     // process our initialization sequence.
@@ -111,6 +114,8 @@ void app_main(void)
         uint8_t wsdir = ws_readwinddirection();
         struct sht4xdata temphum;
         sht4x_read(&temphum);
+        struct sen50data pmdata;
+        sen50_read(&pmdata);
         /* Read Ambient Light in Lux (may block for up to 500 ms!) and switch
          * right back to UV mode */
         float lux = ltr390_readal();
@@ -154,6 +159,17 @@ void app_main(void)
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum);
+        }
+
+        if (pmdata.valid > 0) {
+          ESP_LOGI(TAG, "PM 1.0: %.1f (raw: %x)", pmdata.pm010, pmdata.pm010raw);
+          ESP_LOGI(TAG, "PM 2.5: %.1f (raw: %x)", pmdata.pm025, pmdata.pm025raw);
+          ESP_LOGI(TAG, "PM 4.0: %.1f (raw: %x)", pmdata.pm040, pmdata.pm040raw);
+          ESP_LOGI(TAG, "PM10.0: %.1f (raw: %x)", pmdata.pm100, pmdata.pm100raw);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM010, "pm1.0", pmdata.pm010);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM025, "pm2.5", pmdata.pm025);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM040, "pm4.0", pmdata.pm040);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM100, "pm10.0", pmdata.pm100);
         }
 
         if (uvind >= 0.0) {
