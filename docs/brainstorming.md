@@ -7,14 +7,14 @@
   + MAX44009 Ambient Light sensor (up to 188000 lux)
   + TSL2591 (up to 88000 lux) (in contrast to most others this seems to actually be available)
   + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
-  + we'll now use **TSL2591** for light and **LTR390** for UV sensing.
+  + we'll now use a **LTR390** for both ambient light and UV sensing.
   + This will need to be directly exposed to the sunlight. We'll need to put it under some sort of protective covering, figure out how much light/UV that absorbs, and then correct the measured values accordingly.
 - Pressure
   + **LPS25HB**
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
   + SHT31 / SHT35 / SHT40 / SHT41 / SHT45. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
-  + we'll now use a SHT40 or SHT41.
+  + we'll now use a **SHT41**.
 - Rain
   + **RG15** optical sensor
   + will need to be mounted on a metal arm on its own, needs direct sky access
@@ -64,7 +64,7 @@ This is the planned GPIO / pin usage:
 We have not decided how to distribute all the I2C devices onto the two I2C buses yet.
 (The reason that there are exactly two I2C buses is that this is what the ESP32 can do in hardware.)
 
-The wind direction sensor needs to be wired up like this:
+The wind direction sensor needs to be wired up like this[^1]:
 ```
   3.3V
    |
@@ -72,10 +72,10 @@ The wind direction sensor needs to be wired up like this:
    |
    |- `GPI35`
    |
-windsensor-RJ11 Pin 1[^1]
+windsensor-RJ11 Pin 1
 
 
-windsensor-RJ11 Pin 4[^1]
+windsensor-RJ11 Pin 4
    |
    |
   GND

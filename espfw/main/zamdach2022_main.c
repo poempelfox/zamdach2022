@@ -93,14 +93,17 @@ void app_main(void)
         /* Request update from the sensors that don't autoupdate all the time */
         rg15_requestread();
         sht4x_startmeas();
+        /* Read UV index and switch to ambient light measurement */
+        float uvind = ltr390_readuv();
+        ltr390_startalmeas();
 
         network_on(); /* Turn network on, i.e. connect to WiFi */
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
+
         /* Read all the sensors */
         float press = lps25hb_readpressure();
-        float uvind = ltr390_readuv();
         float raing = rg15_readraincount();
         uint16_t wsctr = ws_readaenometer();
         /* We'll need this extra timestamp to calculate windspeed from number of pulses */
@@ -108,6 +111,10 @@ void app_main(void)
         uint8_t wsdir = ws_readwinddirection();
         struct sht4xdata temphum;
         sht4x_read(&temphum);
+        /* Read Ambient Light in Lux (may block for up to 500 ms!) and switch
+         * right back to UV mode */
+        float lux = ltr390_readal();
+        ltr390_startuvmeas();
 
         /* potentially wait for up to 4 more seconds if we haven't got an
          * IP address yet */
@@ -115,7 +122,7 @@ void app_main(void)
                             pdFALSE, pdFALSE,
                             (4000 / portTICK_PERIOD_MS));
         if (press > 0) {
-          ESP_LOGI(TAG, "That converts to a measured pressure of %.3f hPa, or a calculated pressure of %.3f hPa at sea level.",
+          ESP_LOGI(TAG, "Measured pressure: %.3f hPa, calculated pressure at sea level (FIXME better formula): %.3f hPa",
                         press, reducedairpressurecalc(press));
           /* submit that measurement */
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PRESSURE, "pressure", press);
@@ -152,6 +159,11 @@ void app_main(void)
         if (uvind >= 0.0) {
           ESP_LOGI(TAG, "UV-Index: %.2f", uvind);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UV, "uv", uvind);
+        }
+
+        if (lux >= 0.0) {
+          ESP_LOGI(TAG, "Ambient light/Illuminance: %.2f lux", lux);
+          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_ILLUMINANCE, "illuminance", lux);
         }
 
         network_off();

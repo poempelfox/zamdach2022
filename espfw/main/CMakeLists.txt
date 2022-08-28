@@ -1,4 +1,4 @@
-idf_component_register(SRCS "zamdach2022_main.c" "i2c.c" "lps25hb.c" "ltr390.c" "network.c" "rg15.c" "sht4x.c" "submit.c" "tsl2591.c" "windsens.c"
+idf_component_register(SRCS "zamdach2022_main.c" "i2c.c" "lps25hb.c" "ltr390.c" "network.c" "rg15.c" "sht4x.c" "submit.c" "windsens.c"
                        INCLUDE_DIRS "." ""
                        REQUIRES soc nvs_flash ulp driver esp_http_client)
 

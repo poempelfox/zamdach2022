@@ -6,9 +6,10 @@
 
 
 #define LTR390ADDR 0x53
-#define I2C_MASTER_TIMEOUT_MS 1000  /* Timeout for I2C communication */
+#define I2C_MASTER_TIMEOUT_MS 100  /* Timeout for I2C communication */
 
 #define LTR390_REG_MAINCTRL 0x00
+#define LTR390_ALSMODE 0x00  /* Ambient Light mode (=UV bit not set) */
 #define LTR390_UVSMODE 0x08  /* UV-mode instead of Ambient Light mode */
 #define LTR390_LSENABLE 0x02 /* Enable UV/AL-sensor */
 
@@ -28,22 +29,43 @@
 #define LTR390_RATE2000MS 0x06
 
 #define LTR390_REG_GAIN 0x05
+/* Explanation for the GAIN register:
+ * For UV measurement, just use GAIN18, everything else makes no sense.
+ * For AL measurement however, this determines the range and resolution
+ * of your measurement, and from the formula in the datasheet we can
+ * generate this helpful table:
+ * GAIN  |  max Lux measurable | resolution in Lux
+ *    1  |             157286  |  0.1500
+ *    3  |              52429  |  0.0500
+ *    6  |              26214  |  0.0250
+ *    9  |              17476  |  0.0167
+ *   18  |               8738  |  0.0083
+ */
 #define LTR390_GAIN01 0x00
 #define LTR390_GAIN03 0x01 /* this is the poweron default */
 #define LTR390_GAIN06 0x02
 #define LTR390_GAIN09 0x03
 #define LTR390_GAIN18 0x04
 
+#define LTR390_REG_MAINSTATUS 0x07
+#define LTR390_MSTA_NEWDATA 0x08
+
 #define LTR390_REG_INTCFG 0x19
 #define LTR390_INT_USEALS 0x10 /* this is the poweron default */
 #define LTR390_INT_USEUVS 0x30
 #define LTR390_INT_ENABLE 0x04
+
+#define LTR390_REG_ALSDATAL 0x0d  /* LSB */
+#define LTR390_REG_ALSDATAM 0x0e
+#define LTR390_REG_ALSDATAH 0x0f  /* MSB */
 
 #define LTR390_REG_UVSDATAL 0x10  /* LSB */
 #define LTR390_REG_UVSDATAM 0x11
 #define LTR390_REG_UVSDATAH 0x12  /* MSB */
 
 static i2c_port_t ltr390i2cport;
+static uint8_t alsgainsetting;
+const double glassfactor = 1.0; /* Correction factor for glass above the sensor. */
 
 static esp_err_t ltr390_writereg(uint8_t reg, uint8_t val)
 {
@@ -55,34 +77,49 @@ static esp_err_t ltr390_writereg(uint8_t reg, uint8_t val)
                                       I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
+void ltr390_startuvmeas(void)
+{
+    ltr390_writereg(LTR390_REG_GAIN, LTR390_GAIN18);
+    ltr390_writereg(LTR390_REG_MAINCTRL, (LTR390_UVSMODE | LTR390_LSENABLE));
+}
+
+void ltr390_startalmeas(void)
+{
+    uint8_t g = LTR390_GAIN01;
+    switch (alsgainsetting) {
+    case  3: g = LTR390_GAIN03; break;
+    case  6: g = LTR390_GAIN06; break;
+    case  9: g = LTR390_GAIN09; break;
+    case 18: g = LTR390_GAIN18; break;
+    };
+    ltr390_writereg(LTR390_REG_GAIN, g);
+    ltr390_writereg(LTR390_REG_MAINCTRL, (LTR390_ALSMODE | LTR390_LSENABLE));
+}
+
+void ltr390_stopmeas(void)
+{
+    ltr390_writereg(LTR390_REG_MAINCTRL, 0);
+}
+
 void ltr390_init(i2c_port_t port)
 {
     ltr390i2cport = port;
 
     /* Configure the LTR390 */
-    ltr390_writereg(LTR390_REG_MAINCTRL, (LTR390_UVSMODE | LTR390_LSENABLE));
     ltr390_writereg(LTR390_REG_MEASRATE, (LTR390_RES20BIT | LTR390_RATE2000MS));
-    ltr390_writereg(LTR390_REG_GAIN, LTR390_GAIN18);
-}
-
-static esp_err_t ltr390_readreg(uint8_t reg, uint8_t * val)
-{
-    return i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
-                                        &reg, 1, val, 1,
-                                        I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    ltr390_startuvmeas();
+    
+    alsgainsetting = 1;
 }
 
 double ltr390_readuv(void)
 {
     uint8_t uvsreg[3];
     int isvalid = 1;
-    if (ltr390_readreg(LTR390_REG_UVSDATAL, &uvsreg[0]) != ESP_OK) {
-      isvalid = 0;
-    }
-    if (ltr390_readreg(LTR390_REG_UVSDATAM, &uvsreg[1]) != ESP_OK) {
-      isvalid = 0;
-    }
-    if (ltr390_readreg(LTR390_REG_UVSDATAH, &uvsreg[2]) != ESP_OK) {
+    uint8_t rtr = LTR390_REG_UVSDATAL;
+    if (i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
+        &rtr, 1, &uvsreg[0], 3,
+        I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS) != ESP_OK) {
       isvalid = 0;
     }
     if (isvalid != 1) {
@@ -100,5 +137,70 @@ double ltr390_readuv(void)
     double wfac = 1.0; /* Correction factor for case with window. */
     double uvind = ((double)uvsr32 / uvsensitivity) * wfac;
     return uvind;
+}
+
+double ltr390_readal(void)
+{
+    uint8_t alsreg[3];
+    int isvalid = 1;
+    uint8_t rtr = LTR390_REG_MAINSTATUS;
+    uint8_t repctr = 0;
+    do {
+      if (isvalid != 1) {
+        /* Sleep a short while before retrying */
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      uint8_t res = i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
+                                                 &rtr, 1, &alsreg[0], 1,
+                                                 I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+      if (res != ESP_OK) {
+        isvalid = 0;
+      } else {
+        if ((alsreg[0] & LTR390_MSTA_NEWDATA) == LTR390_MSTA_NEWDATA) {
+          isvalid = 1;
+        } else {
+          isvalid = 0;
+        }
+      }
+      repctr++;
+    } while ((isvalid != 1) && (repctr < 10));
+    if (isvalid != 1) {
+      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (1).");
+      return -1.0;
+    }
+    rtr = LTR390_REG_ALSDATAL;
+    if (i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
+        &rtr, 1, &alsreg[0], 3,
+        I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS) != ESP_OK) {
+      isvalid = 0;
+    }
+    if (isvalid != 1) {
+      /* Read error, signal that we received nonsense by returning a negative UV index */
+      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (2).");
+      return -1.0;
+    }
+    uint32_t alsr32 = ((uint32_t)(alsreg[2] & 0x0F) << 16)
+                    | ((uint32_t)alsreg[1] << 8)
+                    | alsreg[0];
+    double lux = (((double)alsr32 * 0.6) / ((double)alsgainsetting * 4)) * glassfactor;
+#if 1
+    ESP_LOGI("ltr390.c", "DEBUG: raw ALS values %02x%02x%02x at gain %u -> %.3f lux",
+                         alsreg[0], alsreg[1], alsreg[2], alsgainsetting, lux);
+#endif
+    /* Correct the alsgainsetting for the next measurement, if we're
+     * either (almost) overflowing or underflowing. */
+    if (alsr32 > 0xd000) {
+      if (alsgainsetting != 1) {
+        ESP_LOGI("ltr390.c", "switching GAIN for next ambient light measurement to 1");
+      }
+      alsgainsetting = 1;
+    }
+    if (alsr32 < 0x1000) {
+      if (alsgainsetting != 6) {
+        ESP_LOGI("ltr390.c", "switching GAIN for next ambient light measurement to 6");
+      }
+      alsgainsetting = 6;
+    }
+    return lux;
 }
 

@@ -69,4 +69,11 @@ menu "ZAMDACH2022 Configuration"
             The ID of the aenometer (wind speed) sensor for reporting
             to wetter.poempelfox.de
 
+    config ZAMDACH_WPDSID_ILLUMINANCE
+        string "wetter.p.d ID for the illuminance sensor"
+        default "23"
+        help
+            The ID of the illuminance sensor for reporting
+            to wetter.poempelfox.de
+
 endmenu
