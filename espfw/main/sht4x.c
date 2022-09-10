@@ -38,7 +38,7 @@ void sht4x_startmeas(void)
 /* This function is based on Sensirons example code and datasheet
  * for the SHT3x and was written for that. CRC-calculation is
  * exactly the same for the SHT4x, so we reuse it. */
-uint8_t sht4x_crc(uint8_t b1, uint8_t b2)
+static uint8_t sht4x_crc(uint8_t b1, uint8_t b2)
 {
     uint8_t crc = 0xff; /* Start value */
     uint8_t b;
