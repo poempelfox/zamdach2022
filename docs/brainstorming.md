@@ -54,15 +54,14 @@ This is the planned GPIO / pin usage:
 | ---  | --- |
 | `GPI34` == `RTC_GPIO4` | Aenometer (wind speed sensor). Note that this is also connected to the button `BUT1` on the board, so the button can be used for testing. |
 | `GPI35` == `ADC1_CH7` | wind vane (wind direction sensor). Needs external voltage divider and stuff. |
-| `GPIO13` | I2C-bus A SDA |
-| `GPIO16` | I2C-bus A SCL |
-| `GPIO4` == `UART1_TX` | RG15 rain sensor |
-| `GPI36` == `UART1_RX` | RG15 rain sensor |
-| `GPIO14` | I2C-bus B SDA |
-| `GPIO15` | I2C-bus B SCL |
+| `GPIO13` | I2C-bus A SDA - SEN50 (particulate matter sensor) |
+| `GPIO16` | I2C-bus A SCL - SEN50 (particulate matter sensor) |
+| `GPIO4` == `UART1_TX` | RG15 rain sensor serial in |
+| `GPI36` == `UART1_RX` | RG15 rain sensor serial out |
+| `GPIO14` | I2C-bus B SDA - LTR390, SHT41, LPS25HB |
+| `GPIO15` | I2C-bus B SCL - LTR390, SHT41, LPS25HB |
 
-We have not decided how to distribute all the I2C devices onto the two I2C buses yet.
-(The reason that there are exactly two I2C buses is that this is what the ESP32 can do in hardware.)
+Our ESP32 can do two I2C buses in hardware. We put the SEN50 on its own bus because it's the only one that uses 5V supply voltage, and though its I2C is 3.3V compatible, I'd still rather minimize the risk of it killing some of the other sensors accidently. That means everything but the SEN50 is on the other I2C bus.
 
 The wind direction sensor needs to be wired up like this[^1]:
 ```
