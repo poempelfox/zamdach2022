@@ -34,8 +34,7 @@
 
 ## Mainboard
 
-We'll use an Olimex ESP32-POE-ISO.
-Fox has a revision B board lying around.
+We'll use an Olimex ESP32-POE-ISO revision H.
 
 This allows us to either:
 - Power and network through POE
