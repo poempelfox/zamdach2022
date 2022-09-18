@@ -96,10 +96,14 @@ uint8_t ws_readwinddirection(void)
     ESP_LOGI("windsens.c", "Wind vane raw voltage: %d (raw ADV: %d)", v, adcv);
     /* There is one special case: If voltage is way above the
      * expected maximum for the ADC, then apparently only the
-     * pullup resistor is connected and the wind vane is unplugged. */
-    if (v > 3200) {
-      return 99;  /* no valid measurement */
-    }
+     * pullup resistor is connected and the wind vane is unplugged.
+     * Unfortunately, the ESP32s ADC is so horribly bad that we cannot
+     * reliably distinguish 2.8 and 3.3V, so if we use this cutoff we
+     * occasionally invalidate measurements. This is why this is
+     * commented out by default. */
+    //if (adcv > 4000) {
+    //  return 99;  /* no valid measurement */
+    //}
     for (int i = 0; i < 16; i++) {
       if (abs((int)v - (int)voltagemappingtable[i]) < mindiff) {
         mindiff = (uint16_t)abs((int)v - (int)voltagemappingtable[i]);
