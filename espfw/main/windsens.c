@@ -4,6 +4,8 @@
 #include "driver/adc.h"
 #include "esp32/ulp.h"
 #include "ulp_main.h"
+#include "esp_adc_cal.h"
+#include "esp_log.h"
 #include "windsens.h"
 
 /* the binary blob we load into the ULP.
@@ -19,32 +21,34 @@ extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
 
 /* The resistance (in Ohm) of our other resistor in the voltage divider */
 #define OTHERRESISTOR 22000
-/* How to calculate the result of the ADC from the resistor in the voltage divider */
-/* The ADC is set to 12 bit, so the maximum read would be 4095 - at 3.9V
- * (lets ignore the fact that this would fry the controller.)
- * Our input voltage however is 3.3V, so we need to scale this down.
- * The maximum we should see therefore is 3466. */
-#define MAXADCVAL 3466UL
-#define VDCALC(r) (uint16_t)((r * MAXADCVAL) / (r + OTHERRESISTOR))
-/* Table of resistor values from sensor datasheet */
+/* How to calculate the expected voltage from the resistor in the voltage divider */
+#define VDCALC(r) (uint16_t)((r * 3300UL) / (r + OTHERRESISTOR))
+/* Table of resistor values from sensor datasheet.
+ * This contains the expected voltages, as they would be
+ * measured by a PROPER ADC. (Unfortunately, the ADC on the
+ * ESP32 is almost unusable crap, so we'll need to correct
+ * for that) */
 static const uint16_t voltagemappingtable[16] = {
-  VDCALC( 33000), /*    0.0 deg  0 */
-  VDCALC(  6570), /*   22.5 deg  1 */
-  VDCALC(  8200), /*   45.0 deg  2 */
-  VDCALC(   891), /*   67.5 deg  3 */
-  VDCALC(  1000), /*   90.0 deg  4 */
-  VDCALC(   688), /*  112.5 deg  5 */
-  VDCALC(  2200), /*  135.0 deg  6 */
-  VDCALC(  1410), /*  157.5 deg  7 */
-  VDCALC(  3900), /*  180.0 deg  8 */
-  VDCALC(  3140), /*  202.5 deg  9 */
-  VDCALC( 16000), /*  225.0 deg 10 */
-  VDCALC( 14120), /*  247.5 deg 11 */
-  VDCALC(120000), /*  270.0 deg 12 */
-  VDCALC( 42120), /*  292.5 deg 13 */
-  VDCALC( 64900), /*  315.0 deg 14 */
-  VDCALC( 21880)  /*  337.5 deg 15 */
+  VDCALC( 33000), /*    0.0 deg  0  N   */
+  VDCALC(  6570), /*   22.5 deg  1      */
+  VDCALC(  8200), /*   45.0 deg  2      */
+  VDCALC(   891), /*   67.5 deg  3      */
+  VDCALC(  1000), /*   90.0 deg  4      */
+  VDCALC(   688), /*  112.5 deg  5      */
+  VDCALC(  2200), /*  135.0 deg  6      */
+  VDCALC(  1410), /*  157.5 deg  7      */
+  VDCALC(  3900), /*  180.0 deg  8  S   */
+  VDCALC(  3140), /*  202.5 deg  9      */
+  VDCALC( 16000), /*  225.0 deg 10      */
+  VDCALC( 14120), /*  247.5 deg 11      */
+  VDCALC(120000), /*  270.0 deg 12      */
+  VDCALC( 42120), /*  292.5 deg 13      */
+  VDCALC( 64900), /*  315.0 deg 14      */
+  VDCALC( 21880)  /*  337.5 deg 15      */
 };
+
+static esp_adc_cal_characteristics_t * adc_characteristics;
+
 
 void ws_init(void)
 {
@@ -59,6 +63,7 @@ void ws_init(void)
     ESP_ERROR_CHECK(ulp_run(&ulp_entry - RTC_SLOW_MEM));
 
     /* Initialize the ADC for the wind direction sensor */
+    adc_power_acquire();
     adc1_config_width(ADC_WIDTH_BIT_12);
     /* Maximum attenuation (11 dB) - gives full-scale voltage
      * of 3.9V for the ADC, instead of 1.1V, although it's not
@@ -66,6 +71,13 @@ void ws_init(void)
      * (src = ESP-IDF-documentation) and still must not exceed
      * the 3.3V pin maximum voltage  */
     adc1_config_channel_atten(WDADCPORT, ADC_ATTEN_DB_11);
+    adc_characteristics = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_characteristics);
+    for (int i = 0; i < 4; i++) {
+      ESP_LOGI("windsens.c", "Voltagemapping-Table %d/4: %d %d %d %d.",
+                i+1, voltagemappingtable[i*4], voltagemappingtable[i*4+1],
+                voltagemappingtable[i*4+2], voltagemappingtable[i*4+3]);
+    }
 }
 
 uint16_t ws_readaenometer(void)
@@ -79,12 +91,14 @@ uint8_t ws_readwinddirection(void)
 {
     uint8_t res = 99;
     uint16_t mindiff = 0xffff;
-    int v = adc1_get_raw(WDADCPORT);
-    /* There is one special case: If voltage is ABOVE the expected
-     * maximum, we don't really care about distance anymore, then it
-     * has to be the biggest resistor. */
-    if (v > MAXADCVAL) {
-      return 12;  /* The biggest is the 120k Ohm for position 12 */
+    uint32_t adcv = adc1_get_raw(WDADCPORT);
+    uint32_t v = esp_adc_cal_raw_to_voltage(adcv, adc_characteristics);
+    ESP_LOGI("windsens.c", "Wind vane raw voltage: %d (raw ADV: %d)", v, adcv);
+    /* There is one special case: If voltage is way above the
+     * expected maximum for the ADC, then apparently only the
+     * pullup resistor is connected and the wind vane is unplugged. */
+    if (v > 3200) {
+      return 99;  /* no valid measurement */
     }
     for (int i = 0; i < 16; i++) {
       if (abs((int)v - (int)voltagemappingtable[i]) < mindiff) {

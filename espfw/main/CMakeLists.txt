@@ -1,6 +1,6 @@
 idf_component_register(SRCS "zamdach2022_main.c" "i2c.c" "lps25hb.c" "ltr390.c" "network.c" "rg15.c" "sen50.c" "sht4x.c" "submit.c" "windsens.c"
                        INCLUDE_DIRS "." ""
-                       REQUIRES soc nvs_flash ulp driver esp_http_client)
+                       REQUIRES soc nvs_flash ulp driver esp_http_client esp_adc_cal)
 
 # ULP is the ultra-low-power coprocessor that the ESP32 has and that can run
 # constantly during sleep of the main processor with only 1.5 mA, but that is
