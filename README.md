@@ -15,6 +15,7 @@ More info might be in the 'docs' directory.
 * UV-Index (via LTR390)
 * wind speed
 * wind direction
+* rain (via optical RG15 rain sensor)
 
 ## TODO before version "1.0"
 
