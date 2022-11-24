@@ -1,19 +1,20 @@
 /* ZAMDACH2022 main "app"
 */
+#include "sdkconfig.h"
 #include <stdio.h>
 #include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "esp_sleep.h"
-#include "driver/gpio.h"
-#include "math.h"
-#include "nvs_flash.h"
-#include "time.h"
-#include "sdkconfig.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/event_groups.h>
+#include <esp_event.h>
+#include <esp_log.h>
+#include <esp_system.h>
+#include <esp_sleep.h>
+#include <driver/gpio.h>
+#include <math.h>
+#include <nvs_flash.h>
+#include <time.h>
+#include <esp_ota_ops.h>
 #include "secrets.h"
 #include "i2c.h"
 #include "lps25hb.h"
@@ -23,13 +24,16 @@
 #include "sen50.h"
 #include "sht4x.h"
 #include "submit.h"
+#include "webserver.h"
 #include "windsens.h"
 
 static const char *TAG = "zamdach2022";
 
+/* Global / Exported variables, used to provide the webserver.
+ * struct ev is defined in webserver.h for practical reasons. */
 char chipid[30] = "ZAMDACH-UNSET";
-
-#define I2C_MASTER_TIMEOUT_MS 100  /* Timeout for I2C communication */
+struct ev evs[2];
+int activeevs = 0;
 
 double reducedairpressurecalc(double press)
 {
@@ -48,14 +52,21 @@ double reducedairpressurecalc(double press)
 
 void app_main(void)
 {
+    memset(evs, 0, sizeof(evs));
     time_t lastmeasts = 0;
     time_t lastaenomread = 0;
     /* Initialize the windsensor. This includes initializing the ULP
      * Co-processor, we let it count the number of signals received
      * from the windsensor / aenometer. */
     ws_init();
-    /* WiFi does not work without this because... who knows, who cares. */
-    nvs_flash_init();
+    /* This is in all OTA-Update examples, so I consider it mandatory.
+     * Also, WiFi will not work without nvs_flash_init. */
+    esp_err_t err = nvs_flash_init();
+    if ((err == ESP_ERR_NVS_NO_FREE_PAGES) || (err == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
     /* Get our ChipID */
     {
       uint8_t mainmac[6];
@@ -74,19 +85,46 @@ void app_main(void)
     // Create default event loop that running in background
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     
-    /* Configure our (2) I2C-ports */
-    i2cport_init();
-
     network_prepare();
 
+    /* Configure our (2) I2C-ports and then the sensors */
+    i2cport_init();
     lps25hb_init(1);
     ltr390_init(1);
     rg15_init();
     sen50_init(0);
     sen50_startmeas(); /* FIXME Perhaps we don't want this on all the time. */
     sht4x_init(1);
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Mainly to give the RG15 time to
-    // process our initialization sequence.
+
+    /* now start the webserver */
+    webserver_start();
+
+    vTaskDelay(pdMS_TO_TICKS(3000)); /* Mainly to give the RG15 a chance to */
+    /* process our initialization sequence, though that doesn't always work. */
+    /* Wait for up to 4 more seconds to connect to WiFi and get an IP */
+    EventBits_t eb = xEventGroupWaitBits(network_event_group,
+                                         NETWORK_CONNECTED_BIT,
+                                         pdFALSE, pdFALSE,
+                                         (4000 / portTICK_PERIOD_MS));
+    if ((eb & NETWORK_CONNECTED_BIT) == NETWORK_CONNECTED_BIT) {
+      ESP_LOGI(TAG, "Successfully connected to network.");
+      /* In case we were OTA-updating, we mark this image as good now.
+       * Webserver is running, network is up, this is as much sanity
+       * checks as we can realisticly expect. */
+      const esp_partition_t *running = esp_ota_get_running_partition();
+      esp_ota_img_states_t ota_state;
+      if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+          if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
+            ESP_LOGI(TAG, "OTA-Update: Updated firmware is now marked as good.");
+          } else {
+            ESP_LOGE(TAG, "OTA-Update: Failed to mark updated firmware as good, will rollback on next reboot.");
+          }
+        }
+      }
+    } else {
+      ESP_LOGW(TAG, "Warning: Could not connect to network. This is probably not good.");
+    }
 
     while (1) {
       if (((time(NULL) - lastmeasts) >= 60)
@@ -100,7 +138,7 @@ void app_main(void)
         float uvind = ltr390_readuv();
         ltr390_startalmeas();
 
-        network_on(); /* Turn network on, i.e. connect to WiFi */
+        network_on(); /* Turn network on, i.e. connect to WiFi. This happens in the background. */
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
@@ -121,8 +159,12 @@ void app_main(void)
         float lux = ltr390_readal();
         ltr390_startuvmeas();
 
-        /* potentially wait for up to 4 more seconds if we haven't got an
-         * IP address yet */
+        int naevs = (activeevs == 0) ? 1 : 0;
+        evs[naevs].lastupd = lastmeasts;
+
+        /* We will now start to submit our measurements, so we need
+         * a working network connection. Potentially wait for up to
+         * 4 more seconds if we haven't got an IP address yet */
         xEventGroupWaitBits(network_event_group, NETWORK_CONNECTED_BIT,
                             pdFALSE, pdFALSE,
                             (4000 / portTICK_PERIOD_MS));
@@ -130,12 +172,18 @@ void app_main(void)
           ESP_LOGI(TAG, "Measured pressure: %.3f hPa, calculated pressure at sea level (FIXME better formula): %.3f hPa",
                         press, reducedairpressurecalc(press));
           /* submit that measurement */
+          evs[naevs].press = press;
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PRESSURE, "pressure", press);
+        } else {
+          evs[naevs].press = NAN;
         }
 
         if (raing > -0.1) {
           ESP_LOGI(TAG, "Rain: %.3f mm", raing);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_RAINGAUGE1, "precipitation", raing);
+          evs[naevs].raing = raing;
+        } else {
+          evs[naevs].raing = NAN;
         }
 
         if (lastaenomread != 0) { /* Ignore the first read on startup, but other */
@@ -145,6 +193,9 @@ void app_main(void)
           float windspeed = 2.4 * wsctr / tsdif;
           ESP_LOGI(TAG, "Wind speed: %.1f km/h", windspeed);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, "windspeed", windspeed);
+          evs[naevs].windspeed = windspeed;
+        } else {
+          evs[naevs].windspeed = NAN;
         }
         lastaenomread = curaenomread;
 
@@ -152,6 +203,11 @@ void app_main(void)
           char * winddirmap[16] = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
           ESP_LOGI(TAG, "Wind direction: %d (%s)", wsdir, winddirmap[wsdir]);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDDIR, "winddirection", (float)wsdir * 22.5);
+          evs[naevs].winddirdeg = (float)wsdir * 22.5;
+          strcpy(evs[naevs].winddirtxt, winddirmap[wsdir]);
+        } else {
+          evs[naevs].winddirdeg = -1;
+          strcpy(evs[naevs].winddirtxt, "N/A");
         }
 
         if (temphum.valid > 0) {
@@ -159,6 +215,11 @@ void app_main(void)
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum);
+          evs[naevs].temp = temphum.temp;
+          evs[naevs].hum = temphum.hum;
+        } else {
+          evs[naevs].temp = NAN;
+          evs[naevs].hum = NAN;
         }
 
         if (pmdata.valid > 0) {
@@ -170,34 +231,52 @@ void app_main(void)
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM025, "pm2.5", pmdata.pm025);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM040, "pm4.0", pmdata.pm040);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM100, "pm10.0", pmdata.pm100);
+          evs[naevs].pm010 = pmdata.pm010;
+          evs[naevs].pm025 = pmdata.pm025;
+          evs[naevs].pm040 = pmdata.pm040;
+          evs[naevs].pm100 = pmdata.pm100;
+        } else {
+          evs[naevs].pm010 = NAN;
+          evs[naevs].pm025 = NAN;
+          evs[naevs].pm040 = NAN;
+          evs[naevs].pm100 = NAN;
         }
 
         if (uvind >= 0.0) {
           ESP_LOGI(TAG, "UV-Index: %.2f", uvind);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UV, "uv", uvind);
+          evs[naevs].uvind = uvind;
+        } else {
+          evs[naevs].uvind = NAN;
         }
 
         if (lux >= 0.0) {
           ESP_LOGI(TAG, "Ambient light/Illuminance: %.2f lux", lux);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_ILLUMINANCE, "illuminance", lux);
+          evs[naevs].lux = lux;
+        } else {
+          evs[naevs].lux = NAN;
         }
+
+        /* Now mark the updated values as the current ones for the webserver */
+        activeevs = naevs;
 
         network_off();
         long howmuchtosleep = (lastmeasts + 60) - time(NULL) - 1;
-#ifdef CONFIG_ZAMDACH_USEWIFI
+#ifdef CONFIG_ZAMDACH_DOPOWERSAVE
         ESP_LOGI(TAG, "will now enter sleep mode for %ld seconds", howmuchtosleep);
         if (howmuchtosleep > 0) {
           /* This is given in microseconds */
           esp_sleep_enable_timer_wakeup(howmuchtosleep * (int64_t)1000000);
           esp_light_sleep_start();
         }
-#else /* !CONFIG_ZAMDACH_USEWIFI - we use Ethernet */
-        ESP_LOGI(TAG, "will now wait for %ld seconds (no sleep with POE)", howmuchtosleep);
+#else /* !CONFIG_ZAMDACH_DOPOWERSAVE - do not attempt to sleep */
+        ESP_LOGI(TAG, "will now wait for %ld seconds (powersave not possible or disabled)", howmuchtosleep);
         vTaskDelay(pdMS_TO_TICKS(howmuchtosleep * 1000));
-#endif /* !CONFIG_ZAMDACH_USEWIFI */
+#endif /* !CONFIG_ZAMDACH_DOPOWERSAVE */
       } else { // Delay for a short time
         vTaskDelay(pdMS_TO_TICKS(1000));
       }
     }
-
 }
+

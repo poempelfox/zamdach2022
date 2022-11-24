@@ -11,7 +11,11 @@
 
 extern EventGroupHandle_t network_event_group;
 
+/* Prepares network connection.
+ * Unless powersaving is enabled, this also starts to bring the interface up. */
 void network_prepare(void);
+/* Unless powersaving is enabled, network_on and network_off are NOOPs,
+ * we are always connected. */
 void network_on(void);
 void network_off(void);
 
