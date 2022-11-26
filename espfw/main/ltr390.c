@@ -65,7 +65,14 @@
 
 static i2c_port_t ltr390i2cport;
 static uint8_t alsgainsetting;
-const double glassfactor = 1.0; /* Correction factor for glass above the sensor. */
+/* Correction factors for glass above the sensor. These are
+ * different for Ambient Light and UV because the glass
+ * filters different wavelengths differently. */
+/* FIXME: these were determined experimentally, but under
+ * very suboptimal conditions (artifical lighting in the middle
+ * of winter). We should probably redo these in summer. */
+const double glassfactoral = 1.070; /* for Ambient light */
+const double glassfactoruv = 1.102; /* for UV */
 
 static esp_err_t ltr390_writereg(uint8_t reg, uint8_t val)
 {
@@ -134,8 +141,7 @@ double ltr390_readuv(void)
      * only given for gain=18 and resolution=20 bits, so we cannot really use anything
      * else. */
     double uvsensitivity = 2300.0;
-    double wfac = 1.0; /* Correction factor for case with window. */
-    double uvind = ((double)uvsr32 / uvsensitivity) * wfac;
+    double uvind = ((double)uvsr32 / uvsensitivity) * glassfactoruv;
     return uvind;
 }
 
@@ -182,7 +188,7 @@ double ltr390_readal(void)
     uint32_t alsr32 = ((uint32_t)(alsreg[2] & 0x0F) << 16)
                     | ((uint32_t)alsreg[1] << 8)
                     | alsreg[0];
-    double lux = (((double)alsr32 * 0.6) / ((double)alsgainsetting * 4)) * glassfactor;
+    double lux = (((double)alsr32 * 0.6) / ((double)alsgainsetting * 4)) * glassfactoral;
 #if 1
     ESP_LOGI("ltr390.c", "DEBUG: raw ALS values %02x%02x%02x at gain %u -> %.3f lux",
                          alsreg[0], alsreg[1], alsreg[2], alsgainsetting, lux);
