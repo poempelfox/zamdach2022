@@ -15,6 +15,7 @@
 #include <nvs_flash.h>
 #include <time.h>
 #include <esp_ota_ops.h>
+#include <esp_sntp.h>
 #include "secrets.h"
 #include "i2c.h"
 #include "lps25hb.h"
@@ -95,6 +96,15 @@ void app_main(void)
     sen50_init(0);
     sen50_startmeas(); /* FIXME Perhaps we don't want this on all the time. */
     sht4x_init(1);
+
+#ifndef CONFIG_ZAMDACH_DOPOWERSAVE
+    /* Unless we're trying to do powersaving, we do NTP
+     * to provide useful timestamps in our webserver output. */
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "ntp2.fau.de");
+    sntp_setservername(1, "ntp3.fau.de");
+    sntp_init();
+#endif
 
     /* now start the webserver */
     webserver_start();
