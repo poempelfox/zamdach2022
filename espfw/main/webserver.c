@@ -52,8 +52,13 @@ function updrcvd(err, data) {
     document.getElementById("ts").innerHTML = "Update failed.";
   } else {
     for (let k in data) {
-      if (document.getElementById(k) != null)
-        document.getElementById(k).innerHTML = data.k;
+      if (document.getElementById(k) != null) {
+        if (k === "ts") {
+          var jsts = new Date(data[k] * 1000);
+          document.getElementById(k).innerHTML = data[k] + " (" + jsts.toISOString() + ")";
+        } else {
+          document.getElementById(k).innerHTML = data[k];
+        }
       }
     }
   }
