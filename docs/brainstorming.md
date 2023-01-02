@@ -9,6 +9,7 @@
   + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
   + we'll now use a **LTR390** for both ambient light and UV sensing.
   + This will need to be directly exposed to the sunlight. We'll need to put it under some sort of protective covering, figure out how much light/UV that absorbs, and then correct the measured values accordingly.
+  + Update: Sensor is now sitting in a drainpipe covered with a petri dish made from borosilicate. The dish is rather thin, so UV transmission seems to be around 90%, but only in ideal case - reflection seems to play a huge role, highly dependent on the angle of the sun... Hopefully the petri dish will also survive all hailstorms!
 - Pressure
   + **LPS25HB**
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
@@ -44,6 +45,8 @@ This allows us to either:
   + use "big" solar panel with "big" AGM battery, and a readymade solar battery controller that has USB output
   + TIL: there are nowadays such batterys with builtin Bluetooth m(  (the bluetooth is in the BATTERY BLOCK, not in the charge controller!)
   + It would also be possible to connect a LiPo battery directly to the ESP32 board, it has a simple charger builtin, but I don't think that is a good idea. Because considering the harsh conditions this will have to endure, a less volatile battery setup is probably a good idea.
+
+Update: In the final (January 1st 2023) assembly, the mainboard is sitting in an extra housing separated from most other sensors, so we chose to go with PoE because we do not have to worry about the extra heat coming from the power dissipation.
 
 ## GPIO / pin usage
 
