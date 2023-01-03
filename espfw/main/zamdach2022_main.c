@@ -104,7 +104,7 @@ void app_main(void)
     sntp_setservername(0, "ntp2.fau.de");
     sntp_setservername(1, "ntp3.fau.de");
     sntp_init();
-#endif
+#endif /* !CONFIG_ZAMDACH_DOPOWERSAVE */
 
     /* now start the webserver */
     webserver_start();
