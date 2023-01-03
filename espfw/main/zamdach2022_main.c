@@ -273,6 +273,7 @@ void app_main(void)
 
         network_off();
         long howmuchtosleep = (lastmeasts + 60) - time(NULL) - 1;
+        if ((howmuchtosleep < 0) || (howmuchtosleep > 100)) { howmuchtosleep = 60; }
 #ifdef CONFIG_ZAMDACH_DOPOWERSAVE
         ESP_LOGI(TAG, "will now enter sleep mode for %ld seconds", howmuchtosleep);
         if (howmuchtosleep > 0) {
