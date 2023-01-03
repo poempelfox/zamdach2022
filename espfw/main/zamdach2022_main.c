@@ -35,6 +35,7 @@ static const char *TAG = "zamdach2022";
 char chipid[30] = "ZAMDACH-UNSET";
 struct ev evs[2];
 int activeevs = 0;
+int pendingfwverify = 0;
 
 double reducedairpressurecalc(double press)
 {
@@ -106,6 +107,19 @@ void app_main(void)
     sntp_init();
 #endif /* !CONFIG_ZAMDACH_DOPOWERSAVE */
 
+    /* In case we were OTA-updating, we set this fact in a variable for the
+     * webserver. Someone will need to click "Keep this firmware" in the
+     * webinterface to mark the updated firmware image as good, otherwise we
+     * will roll back to the previous and known working version on the next
+     * reset. */
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+      if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+        pendingfwverify = 1;
+      }
+    }
+
     /* now start the webserver */
     webserver_start();
 
@@ -118,20 +132,6 @@ void app_main(void)
                                          (4000 / portTICK_PERIOD_MS));
     if ((eb & NETWORK_CONNECTED_BIT) == NETWORK_CONNECTED_BIT) {
       ESP_LOGI(TAG, "Successfully connected to network.");
-      /* In case we were OTA-updating, we mark this image as good now.
-       * Webserver is running, network is up, this is as much sanity
-       * checks as we can realisticly expect. */
-      const esp_partition_t *running = esp_ota_get_running_partition();
-      esp_ota_img_states_t ota_state;
-      if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-          if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
-            ESP_LOGI(TAG, "OTA-Update: Updated firmware is now marked as good.");
-          } else {
-            ESP_LOGE(TAG, "OTA-Update: Failed to mark updated firmware as good, will rollback on next reboot.");
-          }
-        }
-      }
     } else {
       ESP_LOGW(TAG, "Warning: Could not connect to network. This is probably not good.");
     }

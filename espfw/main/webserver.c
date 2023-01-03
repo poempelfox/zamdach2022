@@ -13,6 +13,7 @@
 extern char chipid[30];
 extern struct ev evs[2];
 extern int activeevs;
+extern int pendingfwverify;
 
 static const char startp_p1[] = R"EOSP1(
 <!DOCTYPE html>
@@ -68,31 +69,44 @@ function updatethings() {
 }
 var myrefresher = setInterval(updatethings, 30000);
 </script>
-<br>Zum Abfragen dieser Daten in Skripten empfiehlt sich
- <a href="/json">das JSON-output unter /json</a>.
-<h3>Firmware-Update:</h3>
+<br>The recommended way for using this data in scripts is to query
+ <a href="/json">the JSON-output under /json</a>.<br>
 Current firmware version:
 )EOSP2";
 
+static const char startp_fww[] = R"EOSPFWW(
+A new firmware has been flashed, and booted up - but it has not been marked as &quot;good&quot; yet.
+Unless you mark the new firmware as &quot;good&quot;, on the next reset the old firmware will be
+restored.
+)EOSPFWW";
+
 static const char startp_p3[] = R"EOSP3(
-<br><form action="/firmwareupdate" method="POST">
-URL:
-<input type="text" name="updateurl" value="https://www.poempelfox.de/espfw/zamdach2022.bin">
+<h3>Admin-Actions:</h3>
+<form action="/adminaction" method="POST">
 Admin-Password:
 <input type="text" name="updatepw">
-<input type="submit" name="su" value="Update Flashen">
-</form>
-Geduld ist gefragt nach dem Klick auf "Update Flashen" - es dauert
-mindestens 30 Sekunden, bevor irgendeine Reaktion erfolgt.
-</body></html>
+<select name="action">
+<option value="flashupdate">Flash Firmware Update</option>
+<option value="reboot">Reboot the Microcontroller</option>
 )EOSP3";
+
+static const char startp_p4[] = R"EOSP4(
+</select>
+<input type="submit" name="su" value="Execute Action">
+URL for firmware Update:
+<input type="text" name="updateurl" value="https://www.poempelfox.de/espfw/zamdach2022.bin">
+</form>
+BE PATIENT after clicking "Flash Firmware Update" - it will take at
+least 30 seconds before the webserver will show any sort of reply.
+</body></html>
+)EOSP4";
 
 /********************************************************
  * End of embedded webpages definition                  *
  ********************************************************/
 
 esp_err_t get_startpage_handler(httpd_req_t * req) {
-  char myresponse[sizeof(startp_p1) + sizeof(startp_p2) + sizeof(startp_p3) + 2000];
+  char myresponse[sizeof(startp_p1) + sizeof(startp_p2) + sizeof(startp_fww) + sizeof(startp_p3) + sizeof(startp_p4) + 2000];
   char * pfp;
   int e = activeevs;
   strcpy(myresponse, startp_p1);
@@ -116,7 +130,14 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   pfp = myresponse + strlen(myresponse);
   pfp += sprintf(pfp, "%s version %s compiled %s %s",
                  appd->project_name, appd->version, appd->date, appd->time);
+  if (pendingfwverify > 0) {
+    strcat(myresponse, startp_fww);
+  }
   strcat(myresponse, startp_p3);
+  if (pendingfwverify > 0) {
+    strcat(myresponse, "<option value=\"markfwasgood\">Mark Firmware as Good</option>");
+  }
+  strcat(myresponse, startp_p4);
   /* The following two lines are the default und thus redundant. */
   httpd_resp_set_status(req, "200 OK");
   httpd_resp_set_type(req, "text/html");
@@ -188,7 +209,7 @@ void unescapeuestring(char * s) {
   *wp = 0;
 }
 
-esp_err_t post_fwup(httpd_req_t * req) {
+esp_err_t post_adminaction(httpd_req_t * req) {
   char postcontent[600];
   char myresponse[1000];
   char tmp1[600];
@@ -215,49 +236,82 @@ esp_err_t post_fwup(httpd_req_t * req) {
     return ESP_OK;
   }
   unescapeuestring(tmp1);
-  ESP_LOGI("webserver.c", "UE AdminPW: '%s'", tmp1);
   if (strcmp(tmp1, ZAMDACH_WEBIFADMINPW) != 0) {
+    ESP_LOGI("webserver.c", "Incorrect AdminPW - UE: '%s'", tmp1);
     httpd_resp_set_status(req, "403 Forbidden");
     strcpy(myresponse, "Admin-Password incorrect.");
     httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
   }
-  if (httpd_query_key_value(postcontent, "updateurl", tmp1, sizeof(tmp1)) != ESP_OK) {
+  if (httpd_query_key_value(postcontent, "action", tmp1, sizeof(tmp1)) != ESP_OK) {
     httpd_resp_set_status(req, "400 Bad Request");
-    strcpy(myresponse, "No updateurl submitted.");
+    strcpy(myresponse, "No adminaction selected.");
     httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
   }
-  unescapeuestring(tmp1);
-  ESP_LOGI("webserver.c", "UE UpdateURL: '%s'", tmp1);
-  sprintf(myresponse, "OK, will try to update from: %s'", tmp1);
-  esp_http_client_config_t httpccfg = {
-      .url = tmp1,
-      .timeout_ms = 60000,
-      .keep_alive_enable = true,
-      .crt_bundle_attach = esp_crt_bundle_attach
-  };
-  ret = esp_https_ota(&httpccfg);
-  if (ret == ESP_OK) {
-    ESP_LOGI("webserver.c", "OTA Succeed, Rebooting...");
-    strcat(myresponse, "OTA Update reported success. Will reboot.");
+  if (strcmp(tmp1, "flashupdate") == 0) {
+    if (httpd_query_key_value(postcontent, "updateurl", tmp1, sizeof(tmp1)) != ESP_OK) {
+      httpd_resp_set_status(req, "400 Bad Request");
+      strcpy(myresponse, "No updateurl submitted.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+      return ESP_OK;
+    }
+    unescapeuestring(tmp1);
+    ESP_LOGI("webserver.c", "UE UpdateURL: '%s'", tmp1);
+    sprintf(myresponse, "OK, will try to update from: %s'", tmp1);
+    esp_http_client_config_t httpccfg = {
+        .url = tmp1,
+        .timeout_ms = 60000,
+        .keep_alive_enable = true,
+        .crt_bundle_attach = esp_crt_bundle_attach
+    };
+    ret = esp_https_ota(&httpccfg);
+    if (ret == ESP_OK) {
+      ESP_LOGI("webserver.c", "OTA Succeed, Rebooting...");
+      strcat(myresponse, "OTA Update reported success. Will reboot.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+      vTaskDelay(3 * (1000 / portTICK_PERIOD_MS)); 
+      esp_restart();
+    } else {
+      ESP_LOGE("webserver.c", "Firmware upgrade failed");
+      strcat(myresponse, "OTA Update reported failure.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+      return ESP_OK;
+    }
+    /* This should not be reached. */
+  } else if (strcmp(tmp1, "reboot") == 0) {
+    ESP_LOGI("webserver.c", "Reboot requested by admin, Rebooting...");
+    strcat(myresponse, "Will reboot now.");
     httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     vTaskDelay(3 * (1000 / portTICK_PERIOD_MS)); 
     esp_restart();
-  } else {
-    ESP_LOGE("webserver.c", "Firmware upgrade failed");
-    strcat(myresponse, "OTA Update reported failure.");
-    httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
+    /* This should not be reached */
+  } else if (strcmp(tmp1, "markfwasgood") == 0) {
+    if (pendingfwverify == 0) {
+      httpd_resp_set_status(req, "400 Bad Request");
+      strcpy(myresponse, "You're trying to mark an already marked firmware.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+      return ESP_OK;
+    }
+    ret = esp_ota_mark_app_valid_cancel_rollback();
+    if (ret == ESP_OK) {
+      ESP_LOGI("webserver.c", "markfirmwareasgood: Updated firmware is now marked as good.");
+      strcat(myresponse, "New firmware was successfully marked as good.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+    } else {
+      ESP_LOGE("webserver.c", "markfirmwareasgood: Failed to mark updated firmware as good, will rollback on next reboot.");
+      strcat(myresponse, "Failed to mark updated firmware as good, will rollback on next reboot.");
+      httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+    }
+    pendingfwverify = 0;
   }
-  /* This should not be reached. */
   return ESP_OK;
 }
 
-static httpd_uri_t uri_fwup = {
-  .uri      = "/firmwareupdate",
+static httpd_uri_t uri_adminaction = {
+  .uri      = "/adminaction",
   .method   = HTTP_POST,
-  .handler  = post_fwup,
+  .handler  = post_adminaction,
   .user_ctx = NULL
 };
 
@@ -278,6 +332,6 @@ void webserver_start(void) {
   }
   httpd_register_uri_handler(server, &uri_startpage);
   httpd_register_uri_handler(server, &uri_json);
-  httpd_register_uri_handler(server, &uri_fwup);
+  httpd_register_uri_handler(server, &uri_adminaction);
 }
 
