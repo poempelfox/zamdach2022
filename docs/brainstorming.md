@@ -9,17 +9,17 @@
   + There seem to be few to no digital UV-sensors available in 2022. VEML6075 and VEML6070 have both been discontinued and there seems to be no successor. Si1145 is available, but it doesn't contain an actual UV sensing element, instead it makes guesstimates from visible+IR light. LTR390 might be our only option.
   + we'll now use a **LTR390** for both ambient light and UV sensing.
   + This will need to be directly exposed to the sunlight. We'll need to put it under some sort of protective covering, figure out how much light/UV that absorbs, and then correct the measured values accordingly.
-  + Update: Sensor is now sitting in a drainpipe covered with a petri dish made from borosilicate. The dish is rather thin, so UV transmission seems to be around 90%, but only in ideal case - reflection seems to play a huge role, highly dependent on the angle of the sun... Hopefully the petri dish will also survive all hailstorms!
+  + we will now mount this in a drainpipe covered with a petri dish made from borosilicate. The dish is rather thin, so UV transmission seems to be around 90%, but only in ideal case - reflection seems to play a huge role, highly dependent on the angle of the sun... Hopefully the petri dish will also survive all hailstorms!
 - Pressure
   + **LPS25HB**
   + This does not need direct exposure to light or air, and can be mounted in a relatively protected position, e.g. together with the ESP32-POE-ISO.
 - Temperature
   + SHT31 / SHT35 / SHT40 / SHT41 / SHT45. the better sensors are probably a waste due to the mounting location - the temperatures on the roof in the middle of the city will always be way off, so the high accuracy is wasted.
-  + we'll now use a **SHT41**.
+  + we'll now use a **SHT41**. Unfortunately, other than with the SHT31, a version with integrated PTFE filters was not available - so it might not be as long-term indestructible as the SHT31 with protective filter are.
 - Rain
   + **RG15** optical sensor
   + will need to be mounted on a metal arm on its own, needs direct sky access
-  + there is also a rain gauge on the Sparkfun weather meter kit - but that will probably not last long. We could still connect it up.
+  + there is also a rain gauge on the Sparkfun weather meter kit - but that will probably not last long. We could still connect it up. Update: we have decided to not connect this up, we have more than enough stuff we have to mount already.
 - Wind speed/direction
   + Sparkfun Weather meter kit https://learn.sparkfun.com/tutorials/weather-meter-hookup-guide/all
   + mounting TBD - this comes with its own metal pole and wind speed/direction sensors on top, and an arm attached to the side for its rain gauge.
@@ -46,7 +46,7 @@ This allows us to either:
   + TIL: there are nowadays such batterys with builtin Bluetooth m(  (the bluetooth is in the BATTERY BLOCK, not in the charge controller!)
   + It would also be possible to connect a LiPo battery directly to the ESP32 board, it has a simple charger builtin, but I don't think that is a good idea. Because considering the harsh conditions this will have to endure, a less volatile battery setup is probably a good idea.
 
-Update: In the final (January 1st 2023) assembly, the mainboard is sitting in an extra housing separated from most other sensors, so we chose to go with PoE because we do not have to worry about the extra heat coming from the power dissipation.
+We have decided to go with PoE. We can get it up onto the roof easily, and it makes our life easier if we don't have to conserve every last bit of power - especially because that is A LOT harder on the ESP32 platform than on an AVR, and even with massive effort can never reach the same level of powersaving.
 
 ## GPIO / pin usage
 
