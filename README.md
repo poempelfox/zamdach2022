@@ -1,7 +1,7 @@
 
 # ZAM-Dach 2022
 
-A bunch of environment sensors mounted on the roof of the ZAM (https://zam.haus) in Erlangen.
+A bunch of environment sensors mounted on the roof of the ZAM (https://zam.haus) in Erlangen, connected to an ESP32 with PoE (Olimex ESP32-POE-ISO-IND). Powered and connected to the network through PoE.
 
 The first version/iteration of this was mounted on the roof of the ZAM on January 1st 2023.
 
