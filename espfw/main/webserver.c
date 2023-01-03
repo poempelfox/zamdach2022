@@ -28,8 +28,8 @@ a:link, a:visited, a:hover { color:#ccccff; }
 </style>
 </head><body>
 <h1>ZAMDACH2022</h1>
-<noscript>Weil JavaScript deaktiviert ist, koennen die gezeigten Werte nicht
- automatisch aktualisiert werden, du musst die Seite neu laden.<br></noscript>
+<noscript>Because JavaScript is disabled, the values shown will not update automatically -
+ you will need to reload the page to see the current values.<br></noscript>
 )EOSP1";
 
 static const char startp_p2[] = R"EOSP2(
@@ -70,12 +70,12 @@ function updatethings() {
 var myrefresher = setInterval(updatethings, 30000);
 </script>
 <br>The recommended way for using this data in scripts is to query
- <a href="/json">the JSON-output under /json</a>.<br>
+ <a href="/json">the JSON-output under /json</a>.<br><br>
 Current firmware version:
 )EOSP2";
 
 static const char startp_fww[] = R"EOSPFWW(
-A new firmware has been flashed, and booted up - but it has not been marked as &quot;good&quot; yet.
+<br>A new firmware has been flashed, and booted up - but it has not been marked as &quot;good&quot; yet.
 Unless you mark the new firmware as &quot;good&quot;, on the next reset the old firmware will be
 restored.
 )EOSPFWW";
@@ -87,12 +87,12 @@ Admin-Password:
 <input type="text" name="updatepw">
 <select name="action">
 <option value="flashupdate">Flash Firmware Update</option>
-<option value="reboot">Reboot the Microcontroller</option>
+<option value="reboot" selected>Reboot the Microcontroller</option>
 )EOSP3";
 
 static const char startp_p4[] = R"EOSP4(
 </select>
-<input type="submit" name="su" value="Execute Action">
+<input type="submit" name="su" value="Execute Action"><br>
 URL for firmware Update:
 <input type="text" name="updateurl" value="https://www.poempelfox.de/espfw/zamdach2022.bin">
 </form>
@@ -258,7 +258,7 @@ esp_err_t post_adminaction(httpd_req_t * req) {
     }
     unescapeuestring(tmp1);
     ESP_LOGI("webserver.c", "UE UpdateURL: '%s'", tmp1);
-    sprintf(myresponse, "OK, will try to update from: %s'", tmp1);
+    sprintf(myresponse, "OK, will try to update from: %s'<br>", tmp1);
     esp_http_client_config_t httpccfg = {
         .url = tmp1,
         .timeout_ms = 60000,
@@ -281,7 +281,7 @@ esp_err_t post_adminaction(httpd_req_t * req) {
     /* This should not be reached. */
   } else if (strcmp(tmp1, "reboot") == 0) {
     ESP_LOGI("webserver.c", "Reboot requested by admin, Rebooting...");
-    strcat(myresponse, "Will reboot now.");
+    strcpy(myresponse, "OK, will reboot in 3 seconds.");
     httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     vTaskDelay(3 * (1000 / portTICK_PERIOD_MS)); 
     esp_restart();
@@ -296,14 +296,18 @@ esp_err_t post_adminaction(httpd_req_t * req) {
     ret = esp_ota_mark_app_valid_cancel_rollback();
     if (ret == ESP_OK) {
       ESP_LOGI("webserver.c", "markfirmwareasgood: Updated firmware is now marked as good.");
-      strcat(myresponse, "New firmware was successfully marked as good.");
+      strcpy(myresponse, "New firmware was successfully marked as good.");
       httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     } else {
       ESP_LOGE("webserver.c", "markfirmwareasgood: Failed to mark updated firmware as good, will rollback on next reboot.");
-      strcat(myresponse, "Failed to mark updated firmware as good, will rollback on next reboot.");
+      strcpy(myresponse, "Failed to mark updated firmware as good, will rollback on next reboot.");
       httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
     }
     pendingfwverify = 0;
+  } else {
+    httpd_resp_set_status(req, "400 Bad Request");
+    strcpy(myresponse, "Unknown adminaction requested.");
+    httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
   }
   return ESP_OK;
 }
