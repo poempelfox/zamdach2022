@@ -9,6 +9,8 @@ The measured data can currently be found here: https://wetter.poempelfox.de/stat
 
 More info (decision making from the development phase) might be in `docs/brainstorming.md`.
 
+<img src="docs/finished1.jpg" alt="Picture of the sensors mounted on the roof" width="1200">
+
 ## Things measured
 
 * particulate matter (via SEN50)
@@ -22,8 +24,6 @@ More info (decision making from the development phase) might be in `docs/brainst
 * rain (via optical RG15 rain sensor)
 
 ## Assembly
-
-FIXME: There really should be some pictures here.
 
 The principal mount for ZAM-Dach2022 is an "U" aluminium tube that is screwed to the mount for the (preexisting) solar panels on the roof.
 It sticks out a bit further than the solar panels.
@@ -45,6 +45,10 @@ Again, a piece of HDF inside the drainage pipe bends keeps things neatly in plac
 The RG15 rain sensor is screwed to the tip of the "U" aluminium tube, with a small bended metal sheet that corrects its angle.
 
 The wind speed and direction sensors came with their own mount, and that is screwed to the "U" aluminium tube with yet another mini-pipe-clamp.
+
+<img src="docs/assembly2.jpg" alt="ZAM-Dach2022 during final assembly" width="1200">
+
+<img src="docs/assembly1.jpg" alt="ZAM-Dach2022 during final assembly" width="1200">
 
 ## Firmware
 
