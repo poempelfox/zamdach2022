@@ -63,6 +63,8 @@ the correct password for that (set in `secrets.h` at compile time).
 
 The firmware will also send all values to wetter.poempelfox.de for storage.
 
+<img src="docs/webinterface1.png" alt="A screenshot of the microcontrollers spartan webinterface" width="923">
+
 ### TODOs
 
 Unfortunately, the following features were not implemented before the sensor
