@@ -16,6 +16,7 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     esp_http_client_config_t httpcc = {
       .url = "http://wetter.poempelfox.de/api/pushmeasurement",
       .method = HTTP_METHOD_POST,
+      .timeout_ms = 5000,
       .user_agent = "ZAMDACH2022/0.1 (ESP32)"
     };
     esp_http_client_handle_t httpcl = esp_http_client_init(&httpcc);
