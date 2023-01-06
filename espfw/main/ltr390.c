@@ -123,7 +123,32 @@ double ltr390_readuv(void)
 {
     uint8_t uvsreg[3];
     int isvalid = 1;
-    uint8_t rtr = LTR390_REG_UVSDATAL;
+    uint8_t repctr = 0;
+    uint8_t rtr = LTR390_REG_MAINSTATUS;
+    do {
+      if (isvalid != 1) {
+        /* Sleep a short while before retrying */
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      uint8_t res = i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
+                                                 &rtr, 1, &uvsreg[0], 1,
+                                                 I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+      if (res != ESP_OK) {
+        isvalid = 0;
+      } else {
+        if ((uvsreg[0] & LTR390_MSTA_NEWDATA) == LTR390_MSTA_NEWDATA) {
+          isvalid = 1;
+        } else {
+          isvalid = 0;
+        }
+      }
+      repctr++;
+    } while ((isvalid != 1) && (repctr < 10));
+    if (isvalid != 1) {
+      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (3).");
+      return -1.0;
+    }
+    rtr = LTR390_REG_UVSDATAL;
     if (i2c_master_write_read_device(ltr390i2cport, LTR390ADDR,
         &rtr, 1, &uvsreg[0], 3,
         I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS) != ESP_OK) {
@@ -131,7 +156,7 @@ double ltr390_readuv(void)
     }
     if (isvalid != 1) {
       /* Read error, signal that we received nonsense by returning a negative UV index */
-      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed.");
+      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (4).");
       return -1.0;
     }
     uint32_t uvsr32 = ((uint32_t)(uvsreg[2] & 0x0F) << 16)
@@ -139,7 +164,12 @@ double ltr390_readuv(void)
                     | uvsreg[0];
     /* The datasheet uses "UV sensitivity" in the UV index formula, and that one is
      * only given for gain=18 and resolution=20 bits, so we cannot really use anything
-     * else. */
+     * else.
+     * And it is extremely weird: There seem to be versions "1.2"-"1.4" of the datasheet,
+     * that list uvsensitivity as 1400 instead of 2300, but optoelectronics.liteon.com
+     * does not list the LTR390 at all anymore, and google only finds the version "1.1"
+     * datasheet there. The only source for the "1.4" datasheet is a github repo for
+     * an Arduino-library: https://github.com/levkovigor/LTR390 */
     double uvsensitivity = 2300.0;
     double uvind = ((double)uvsr32 / uvsensitivity) * glassfactoruv;
     return uvind;
@@ -188,7 +218,7 @@ double ltr390_readal(void)
     uint32_t alsr32 = ((uint32_t)(alsreg[2] & 0x0F) << 16)
                     | ((uint32_t)alsreg[1] << 8)
                     | alsreg[0];
-    double lux = (((double)alsr32 * 0.6) / ((double)alsgainsetting * 4)) * glassfactoral;
+    double lux = (((double)alsr32 * 0.6) / ((double)alsgainsetting * 4.0)) * glassfactoral;
 #if 1
     ESP_LOGI("ltr390.c", "DEBUG: raw ALS values %02x%02x%02x at gain %u -> %.3f lux",
                          alsreg[0], alsreg[1], alsreg[2], alsgainsetting, lux);
@@ -201,11 +231,11 @@ double ltr390_readal(void)
       }
       alsgainsetting = 1;
     }
-    if (alsr32 < 0x1000) {
-      if (alsgainsetting != 6) {
-        ESP_LOGI("ltr390.c", "switching GAIN for next ambient light measurement to 6");
+    if (alsr32 < 0x800) {
+      if (alsgainsetting != 18) {
+        ESP_LOGI("ltr390.c", "switching GAIN for next ambient light measurement to 18");
       }
-      alsgainsetting = 6;
+      alsgainsetting = 18;
     }
     return lux;
 }

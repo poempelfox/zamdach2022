@@ -13,10 +13,15 @@ void ltr390_startuvmeas(void);
 void ltr390_startalmeas(void);
 /* Stop measurements
  * Measurements will generally be repeated automatically every
- * 2 seconds until stopped with ltr390_stopmeas() */
+ * 2 seconds until stopped with ltr390_stopmeas().
+ * Note that there is no need to stop the previous measurement
+ * before calling startXXmeas() again. */
 void ltr390_stopmeas(void);
-/* Read UV measurement results. You need to have started an UV
- * measurement at least 400 ms before calling this. */
+/* Read UV measurement results.
+ * You should have started an UV measurement 400 ms before,
+ * but if you haven't, this will block and wait for up to 500ms
+ * for a result.
+ */
 double ltr390_readuv(void);
 /* Read AmbientLight measurement results.
  * You should have started an AL measurement 400 ms before,
