@@ -119,7 +119,7 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "<tr><th>PM 4.0 (&micro;g/m&sup3;)</th><td id=\"pm040\">%.1f</td></tr>", evs[e].pm040);
   pfp += sprintf(pfp, "<tr><th>PM 10.0 (&micro;g/m&sup3;)</th><td id=\"pm100\">%.1f</td></tr>", evs[e].pm100);
   pfp += sprintf(pfp, "<tr><th>Pressure (hPa)</th><td id=\"press\">%.3f</td></tr>", evs[e].press);
-  pfp += sprintf(pfp, "<tr><th>Illuminance (lux)</th><td id=\"lux\">%.0f</td></tr>", evs[e].lux);
+  pfp += sprintf(pfp, "<tr><th>Illuminance (lux)</th><td id=\"lux\">%.2f</td></tr>", evs[e].lux);
   pfp += sprintf(pfp, "<tr><th>UV-Index</th><td id=\"uvind\">%.2f</td></tr>", evs[e].uvind);
   pfp += sprintf(pfp, "<tr><th>Rain (mm/min)</th><td id=\"raing\">%.2f</td></tr>", evs[e].raing);
   pfp += sprintf(pfp, "<tr><th>Wind speed (km/h)</th><td id=\"windspeed\">%.1f</td></tr>", evs[e].windspeed);
@@ -167,7 +167,7 @@ esp_err_t get_json_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "\"pm040\":\"%.1f\",", evs[e].pm040);
   pfp += sprintf(pfp, "\"pm100\":\"%.1f\",", evs[e].pm100);
   pfp += sprintf(pfp, "\"press\":\"%.3f\",", evs[e].press);
-  pfp += sprintf(pfp, "\"lux\":\"%.0f\",", evs[e].lux);
+  pfp += sprintf(pfp, "\"lux\":\"%.2f\",", evs[e].lux);
   pfp += sprintf(pfp, "\"uvind\":\"%.2f\",", evs[e].uvind);
   pfp += sprintf(pfp, "\"raing\":\"%.2f\",", evs[e].raing);
   pfp += sprintf(pfp, "\"windspeed\":\"%.1f\",", evs[e].windspeed);
