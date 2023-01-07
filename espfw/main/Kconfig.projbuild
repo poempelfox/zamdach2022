@@ -113,4 +113,94 @@ menu "ZAMDACH2022 Configuration"
             The ID of the particulate matter 10.0 sensor for reporting
             to wetter.poempelfox.de
 
+    config ZAMDACH_OSM_BOXID
+        string "OpenSenseMap Box-ID"
+        default "63b83dcc6795ba0007794c93"
+        help
+            The SenseBox-ID for reporting data to opensensemap.org
+
+    config ZAMDACH_OSMSID_HUMIDITY
+        string "opensensemap sensor-ID for the humidity sensor"
+        default "63b83dcc6795ba0007794c9c"
+        help
+            The ID of the humidity sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_PRESSURE
+        string "opensensemap sensor-ID for the pressure sensor"
+        default "63b83dcc6795ba0007794c9b"
+        help
+            The ID of the pressure sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_RAINGAUGE1
+        string "opensensemap sensor-ID for the RG15 raingauge"
+        default "63b83dcc6795ba0007794c9e"
+        help
+            The ID of the RG15 raingauge sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_TEMPERATURE
+        string "opensensemap sensor-ID for the temperature sensor"
+        default "63b83dcc6795ba0007794c9d"
+        help
+            The ID of the temperature sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_UV
+        string "opensensemap sensor-ID for the UV sensor"
+        default "63b83dcc6795ba0007794c94"
+        help
+            The ID of the UV sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_WINDDIR
+        string "opensensemap sensor-ID for the wind vane (wind direction)"
+        default "63b83dcc6795ba0007794c96"
+        help
+            The ID of the wind vane (wind direction) sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_WINDSPEED
+        string "opensensemap sensor-ID for the aenometer (wind speed)"
+        default "63b83dcc6795ba0007794c97"
+        help
+            The ID of the aenometer (wind speed) sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_ILLUMINANCE
+        string "opensensemap sensor-ID for the illuminance sensor"
+        default "63b83dcc6795ba0007794c95"
+        help
+            The ID of the illuminance sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_PM010
+        string "opensensemap sensor-ID for the PM1.0 sensor"
+        default "63b83dcc6795ba0007794c9a"
+        help
+            The ID of the particulate matter 1.0 sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_PM025
+        string "opensensemap sensor-ID for the PM2.5 sensor"
+        default "63b83dcc6795ba0007794c99"
+        help
+            The ID of the particulate matter 2.5 sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_PM040
+        string "opensensemap sensor-ID for the PM4.0 sensor"
+        default ""
+        help
+            The ID of the particulate matter 4.0 sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_PM100
+        string "opensensemap sensor-ID for the PM10.0 sensor"
+        default "63b83dcc6795ba0007794c98"
+        help
+            The ID of the particulate matter 10.0 sensor for reporting
+            to opensensemap.org
+
 endmenu

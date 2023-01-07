@@ -184,6 +184,7 @@ void app_main(void)
           /* submit that measurement */
           evs[naevs].press = press;
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PRESSURE, "pressure", press);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PRESSURE, press);
         } else {
           evs[naevs].press = NAN;
         }
@@ -191,6 +192,8 @@ void app_main(void)
         if (raing > -0.1) {
           ESP_LOGI(TAG, "Rain: %.3f mm", raing);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_RAINGAUGE1, "precipitation", raing);
+          //FIXME not yet, values not sane
+          //submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_RAINGAUGE1, raing);
           evs[naevs].raing = raing;
         } else {
           evs[naevs].raing = NAN;
@@ -203,6 +206,7 @@ void app_main(void)
           float windspeed = 2.4 * wsctr / tsdif;
           ESP_LOGI(TAG, "Wind speed: %.1f km/h", windspeed);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, "windspeed", windspeed);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_WINDSPEED, windspeed);
           evs[naevs].windspeed = windspeed;
         } else {
           evs[naevs].windspeed = NAN;
@@ -213,6 +217,7 @@ void app_main(void)
           char * winddirmap[16] = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
           ESP_LOGI(TAG, "Wind direction: %d (%s)", wsdir, winddirmap[wsdir]);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDDIR, "winddirection", (float)wsdir * 22.5);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_WINDDIR, (float)wsdir * 22.5);
           evs[naevs].winddirdeg = (float)wsdir * 22.5;
           strcpy(evs[naevs].winddirtxt, winddirmap[wsdir]);
         } else {
@@ -225,6 +230,8 @@ void app_main(void)
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_TEMPERATURE, temphum.temp);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_HUMIDITY, temphum.hum);
           evs[naevs].temp = temphum.temp;
           evs[naevs].hum = temphum.hum;
         } else {
@@ -241,6 +248,10 @@ void app_main(void)
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM025, "pm2.5", pmdata.pm025);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM040, "pm4.0", pmdata.pm040);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM100, "pm10.0", pmdata.pm100);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM010, pmdata.pm010);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM025, pmdata.pm025);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM040, pmdata.pm040);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM100, pmdata.pm100);
           evs[naevs].pm010 = pmdata.pm010;
           evs[naevs].pm025 = pmdata.pm025;
           evs[naevs].pm040 = pmdata.pm040;
@@ -255,6 +266,8 @@ void app_main(void)
         if (uvind >= 0.0) {
           ESP_LOGI(TAG, "UV-Index: %.2f", uvind);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_UV, "uv", uvind);
+          //FIXME not yet, values not sane
+          //submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_UV, uvind);
           evs[naevs].uvind = uvind;
         } else {
           evs[naevs].uvind = NAN;
@@ -263,6 +276,7 @@ void app_main(void)
         if (lux >= 0.0) {
           ESP_LOGI(TAG, "Ambient light/Illuminance: %.2f lux", lux);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_ILLUMINANCE, "illuminance", lux);
+          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_ILLUMINANCE, lux);
           evs[naevs].lux = lux;
         } else {
           evs[naevs].lux = NAN;
@@ -273,7 +287,7 @@ void app_main(void)
 
         network_off();
         long howmuchtosleep = (lastmeasts + 60) - time(NULL) - 1;
-        if ((howmuchtosleep < 0) || (howmuchtosleep > 100)) { howmuchtosleep = 60; }
+        if ((howmuchtosleep < 0) || (howmuchtosleep > 60)) { howmuchtosleep = 60; }
 #ifdef CONFIG_ZAMDACH_DOPOWERSAVE
         ESP_LOGI(TAG, "will now enter sleep mode for %ld seconds", howmuchtosleep);
         if (howmuchtosleep > 0) {
