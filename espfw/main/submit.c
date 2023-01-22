@@ -24,7 +24,7 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     char post_data[400];
     sprintf(post_data, "{\n\"software_version\":\"0.1\",\n\"sensordatavalues\":[{\"value_type\":\"%s\",\"value\":\"%.3f\"}]}", valuetype, value);
     esp_http_client_config_t httpcc = {
-      .url = "https://wetter.poempelfox.de/api/pushmeasurement",
+      .url = "http://wetter.poempelfox.de/api/pushmeasurement",
       .crt_bundle_attach = esp_crt_bundle_attach,
       .method = HTTP_METHOD_POST,
       .timeout_ms = 5000,
@@ -48,21 +48,29 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     return res;
 }
 
-int submit_to_opensensemap(char * boxid, char * sensorid, float value)
+int submit_to_opensensemap_multi(char * boxid, int arraysize, struct osm * arrayofosm)
 {
     int res = 1;
     /* No check for authentication token because not having one can be perfectly
      * valid for opensensemap */
-    if ((strcmp(boxid, "") == 0)
-     || (strcmp(sensorid, "") == 0)) {
-      ESP_LOGI("submit.c", "Not sending data to opensensemap because either boxid or sensorid is not set.");
+    if (strcmp(boxid, "") == 0) {
+      ESP_LOGI("submit.c", "Not sending data to opensensemap because boxid is not set.");
       return 1;
     }
     /* Send HTTP POST to api.opensensemap.org */
-    char post_data[100];
-    sprintf(post_data, "{\"value\":\"%.3f\"}", value);
+    char post_data[300];
+    strcpy(post_data, "[");
+    for (int i = 0; i < arraysize; i++) {
+      if (strcmp(arrayofosm[i].sensorid, "") != 0) {
+        sprintf(&post_data[strlen(post_data)],
+                "{\"sensor\":\"%s\",\"value\":\"%.3f\"},",
+                arrayofosm[i].sensorid, arrayofosm[i].value);
+      }
+    }
+    post_data[strlen(post_data)-1] = ']'; // We overwrite the ',' after the last entry
+    ESP_LOGI("submit.c", "opensensemap-payload: %d bytes: '%s'", strlen(post_data), post_data);
     char apiurl[200];
-    sprintf(apiurl, "https://api.opensensemap.org/boxes/%s/%s", boxid, sensorid);
+    sprintf(apiurl, "https://api.opensensemap.org/boxes/%s/data", boxid);
     esp_http_client_config_t httpcc = {
       .url = apiurl,
       .crt_bundle_attach = esp_crt_bundle_attach,
@@ -87,5 +95,17 @@ int submit_to_opensensemap(char * boxid, char * sensorid, float value)
     }
     esp_http_client_cleanup(httpcl);
     return res;
+}
+
+int submit_to_opensensemap(char * boxid, char * sensorid, float value)
+{
+  struct osm aoosm[1];
+  if (strcmp(sensorid, "") == 0) {
+    ESP_LOGI("submit.c", "Not sending data to opensensemap because sensorid is not set.");
+    return 1;
+  }
+  aoosm[0].sensorid = sensorid;
+  aoosm[0].value = value;
+  return submit_to_opensensemap_multi(boxid, 1, aoosm);
 }
 

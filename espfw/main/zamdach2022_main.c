@@ -230,8 +230,12 @@ void app_main(void)
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_TEMPERATURE, "temperature", temphum.temp);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_HUMIDITY, "humidity", temphum.hum);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_TEMPERATURE, temphum.temp);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_HUMIDITY, temphum.hum);
+          struct osm thosm[2];
+          thosm[0].sensorid = CONFIG_ZAMDACH_OSMSID_TEMPERATURE;
+          thosm[0].value = temphum.temp;
+          thosm[1].sensorid = CONFIG_ZAMDACH_OSMSID_HUMIDITY;
+          thosm[1].value = temphum.hum;
+          submit_to_opensensemap_multi(CONFIG_ZAMDACH_OSM_BOXID, 2, thosm);
           evs[naevs].temp = temphum.temp;
           evs[naevs].hum = temphum.hum;
         } else {
@@ -239,6 +243,8 @@ void app_main(void)
           evs[naevs].hum = NAN;
         }
 
+        /* FIXME for testing */
+        pmdata.valid = 1;
         if (pmdata.valid > 0) {
           ESP_LOGI(TAG, "PM 1.0: %.1f (raw: %x)", pmdata.pm010, pmdata.pm010raw);
           ESP_LOGI(TAG, "PM 2.5: %.1f (raw: %x)", pmdata.pm025, pmdata.pm025raw);
@@ -248,10 +254,16 @@ void app_main(void)
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM025, "pm2.5", pmdata.pm025);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM040, "pm4.0", pmdata.pm040);
           submit_to_wpd(CONFIG_ZAMDACH_WPDSID_PM100, "pm10.0", pmdata.pm100);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM010, pmdata.pm010);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM025, pmdata.pm025);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM040, pmdata.pm040);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_PM100, pmdata.pm100);
+          struct osm pmdosm[4];
+          pmdosm[0].sensorid = CONFIG_ZAMDACH_OSMSID_PM010;
+          pmdosm[0].value = pmdata.pm010;
+          pmdosm[1].sensorid = CONFIG_ZAMDACH_OSMSID_PM025;
+          pmdosm[1].value = pmdata.pm025;
+          pmdosm[2].sensorid = CONFIG_ZAMDACH_OSMSID_PM040;
+          pmdosm[2].value = pmdata.pm040;
+          pmdosm[3].sensorid = CONFIG_ZAMDACH_OSMSID_PM100;
+          pmdosm[3].value = pmdata.pm100;
+          submit_to_opensensemap_multi(CONFIG_ZAMDACH_OSM_BOXID, 4, pmdosm);
           evs[naevs].pm010 = pmdata.pm010;
           evs[naevs].pm025 = pmdata.pm025;
           evs[naevs].pm040 = pmdata.pm040;
