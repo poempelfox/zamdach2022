@@ -243,8 +243,6 @@ void app_main(void)
           evs[naevs].hum = NAN;
         }
 
-        /* FIXME for testing */
-        pmdata.valid = 1;
         if (pmdata.valid > 0) {
           ESP_LOGI(TAG, "PM 1.0: %.1f (raw: %x)", pmdata.pm010, pmdata.pm010raw);
           ESP_LOGI(TAG, "PM 2.5: %.1f (raw: %x)", pmdata.pm025, pmdata.pm025raw);
