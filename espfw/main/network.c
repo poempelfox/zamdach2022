@@ -1,11 +1,14 @@
 
 #include "network.h"
-#include "driver/gpio.h"
-#include "esp_netif.h"
-#include "esp_eth.h"
-#include "esp_wifi.h"
-#include "esp_log.h"
-#include "time.h"
+#include <lwip/dhcp6.h>
+#include <driver/gpio.h>
+#include <esp_netif.h>
+#include <esp_netif_net_stack.h>
+#include <lwip/netif.h>
+#include <esp_eth.h>
+#include <esp_wifi.h>
+#include <esp_log.h>
+#include <time.h>
 #include "sdkconfig.h"
 #include "secrets.h"
 
@@ -14,6 +17,10 @@ extern char chipid[30];
 EventGroupHandle_t network_event_group;
 
 #ifndef CONFIG_ZAMDACH_USEWIFI
+/* We need to make this a global variable, because the eth_event_handler
+ * needs it to set options for DHCP6. */
+esp_netif_t * mainnetif = NULL;
+
 /** Event handler for Ethernet events */
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
                               int32_t event_id, void *event_data)
@@ -21,6 +28,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
     uint8_t mac_addr[6] = {0};
     /* we can get the ethernet driver handle from event data */
     esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+    struct netif * lwip_netif;
 
     switch (event_id) {
     case ETHERNET_EVENT_CONNECTED:
@@ -28,6 +36,22 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI("network.c", "Ethernet Link Up");
         ESP_LOGI("network.c", "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+        /* This is of course not in the documentation, but a bugreport
+         * reveals the next 2 lines are needed to have working IPv6 on
+         * Ethernet. It seems to work fine without these on WiFi though! */
+        lwip_netif = esp_netif_get_netif_impl(mainnetif);
+        netif_set_flags(lwip_netif, NETIF_FLAG_MLD6);
+        esp_netif_create_ip6_linklocal(mainnetif);
+        /* Unfortunately, neither esp-idf nor the LWIP-library they
+         * use beneath support proper DHCPv6. They only support
+         * "stateless DHCPv6" and with that they mean they do not
+         * support address assignment, but can query the DHCP for
+         * settings.
+         * The following line would enable to get DNS and NTP servers
+         * from DHCPv6, if "Enable DHCPv6 stateless address
+         * autoconfiguration" was on in sdkconfig. However, that's
+         * pretty pointless, so we don't use it for now */
+        //dhcp6_enable_stateless(lwip_netif);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         ESP_LOGI("network.c", "Ethernet Link Down");
@@ -78,15 +102,30 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
                                  int32_t event_id, void *event_data)
 {
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-    const esp_netif_ip_info_t *ip_info = &event->ip_info;
-
-    ESP_LOGI("network.c", "We got an IP address!");
-    ESP_LOGI("network.c", "~~~~~~~~~~~");
-    ESP_LOGI("network.c", "IP:     " IPSTR, IP2STR(&ip_info->ip));
-    ESP_LOGI("network.c", "NETMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    ESP_LOGI("network.c", "GW:     " IPSTR, IP2STR(&ip_info->gw));
-    ESP_LOGI("network.c", "~~~~~~~~~~~");
+    ip_event_got_ip_t * event4;
+    const esp_netif_ip_info_t *ip_info;
+    ip_event_got_ip6_t * event6;
+    const esp_netif_ip6_info_t * ip6_info;
+    switch (event_id) {
+    case IP_EVENT_STA_GOT_IP:
+    case IP_EVENT_ETH_GOT_IP:
+      ESP_LOGI("network.c", "We got an IPv4 address!");
+      event4 = (ip_event_got_ip_t *)event_data;
+      ip_info = &event4->ip_info;
+      ESP_LOGI("network.c", "IP:     " IPSTR, IP2STR(&ip_info->ip));
+      ESP_LOGI("network.c", "NETMASK:" IPSTR, IP2STR(&ip_info->netmask));
+      ESP_LOGI("network.c", "GW:     " IPSTR, IP2STR(&ip_info->gw));
+      break;
+    case IP_EVENT_GOT_IP6:
+      ESP_LOGI("network.c", "We got an IPv6 address!");
+      event6 = (ip_event_got_ip6_t *)event_data;
+      ip6_info = &event6->ip6_info;
+      ESP_LOGI("network.c", "IPv6:" IPV6STR, IPV62STR(ip6_info->ip));
+      break;
+    case IP_EVENT_STA_LOST_IP:
+    case IP_EVENT_ETH_LOST_IP:
+      ESP_LOGI("network.c", "IP-address lost.");
+    };
     xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_BIT);
 }
 
@@ -119,7 +158,7 @@ void network_prepare(void)
 #else /* !CONFIG_ZAMDACH_USEWIFI - we use ethernet */
     // Create new default instance of esp-netif for Ethernet
     esp_netif_config_t nicfg = ESP_NETIF_DEFAULT_ETH();
-    esp_netif_t * mainnetif = esp_netif_new(&nicfg);
+    mainnetif = esp_netif_new(&nicfg);
     esp_netif_set_hostname(mainnetif, chipid);
 
     // Init MAC and PHY configs to default
@@ -146,9 +185,10 @@ void network_prepare(void)
     /* attach Ethernet driver to TCP/IP stack */
     ESP_ERROR_CHECK(esp_netif_attach(mainnetif, esp_eth_new_netif_glue(eth_handle)));
 
-    // Register user defined event handers
+    /* Register user defined event handers. Should be the
+     * last thing before esp_eth_start! */
     ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &got_ip_event_handler, NULL));
 
     /* start Ethernet driver state machine */
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
