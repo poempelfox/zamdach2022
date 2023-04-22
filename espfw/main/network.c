@@ -2,6 +2,7 @@
 #include "network.h"
 #include <lwip/dhcp6.h>
 #include <driver/gpio.h>
+#include <esp_rom_gpio.h>
 #include <esp_netif.h>
 #include <esp_netif_net_stack.h>
 #include <lwip/netif.h>
@@ -161,23 +162,24 @@ void network_prepare(void)
     mainnetif = esp_netif_new(&nicfg);
     esp_netif_set_hostname(mainnetif, chipid);
 
-    // Init MAC and PHY configs to default
-    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
-    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
-
-    phy_config.phy_addr = 0;  /* ESP32-POE-ISO */
-    phy_config.reset_gpio_num = -1; /* ESP32-POE-ISO */
-
-    /* EDIT for ESP32-POE-ISO: Turn Power on through GPIO12 */
+    /* for ESP32-POE-ISO: Turn PHY Power on through GPIO12 */
     int phypowerpin = 12;
-    gpio_pad_select_gpio(phypowerpin);
+    esp_rom_gpio_pad_select_gpio(phypowerpin);
     gpio_set_direction(phypowerpin, GPIO_MODE_OUTPUT);
     gpio_set_level(phypowerpin, 1);
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    mac_config.smi_mdc_gpio_num = 23; /* ESP32-POE-ISO */
-    mac_config.smi_mdio_gpio_num = 18; /* ESP32-POE-ISO */
-    esp_eth_mac_t * ethmac = esp_eth_mac_new_esp32(&mac_config);
+    // Init MAC and PHY configs to default
+    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+    eth_esp32_emac_config_t emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
+    emac_config.smi_mdc_gpio_num = 23; /* ESP32-POE-ISO */
+    emac_config.smi_mdio_gpio_num = 18; /* ESP32-POE-ISO */
+    esp_eth_mac_t * ethmac = esp_eth_mac_new_esp32(&emac_config, &mac_config);
+
+    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+    phy_config.phy_addr = 0;  /* ESP32-POE-ISO */
+    phy_config.reset_gpio_num = -1; /* ESP32-POE-ISO */
+
     esp_eth_phy_t * ethphy = esp_eth_phy_new_lan87xx(&phy_config);
     esp_eth_config_t config = ETH_DEFAULT_CONFIG(ethmac, ethphy);
     esp_eth_handle_t eth_handle = NULL;

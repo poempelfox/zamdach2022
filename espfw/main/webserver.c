@@ -111,7 +111,7 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   int e = activeevs;
   strcpy(myresponse, startp_p1);
   pfp = myresponse + strlen(startp_p1);
-  pfp += sprintf(pfp, "<table><tr><th>UpdateTS</th><td id=\"ts\">%ld</td></tr>", evs[e].lastupd);
+  pfp += sprintf(pfp, "<table><tr><th>UpdateTS</th><td id=\"ts\">%lld</td></tr>", evs[e].lastupd);
   pfp += sprintf(pfp, "<tr><th>Temperature (C)</th><td id=\"temp\">%.2f</td></tr>", evs[e].temp);
   pfp += sprintf(pfp, "<tr><th>Humidity (%%)</th><td id=\"hum\">%.1f</td></tr>", evs[e].hum);
   pfp += sprintf(pfp, "<tr><th>PM 1.0 (&micro;g/m&sup3;)</th><td id=\"pm010\">%.1f</td></tr>", evs[e].pm010);
@@ -125,7 +125,7 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "<tr><th>Wind speed (km/h)</th><td id=\"windspeed\">%.1f</td></tr>", evs[e].windspeed);
   pfp += sprintf(pfp, "<tr><th>Wind direction</th><td id=\"winddirtxt\">%s</td></tr>", evs[e].winddirtxt);
   pfp += sprintf(pfp, "</table>");
-  const esp_app_desc_t * appd = esp_ota_get_app_description();
+  const esp_app_desc_t * appd = esp_app_get_description();
   strcat(myresponse, startp_p2);
   pfp = myresponse + strlen(myresponse);
   pfp += sprintf(pfp, "%s version %s compiled %s %s",
@@ -159,7 +159,7 @@ esp_err_t get_json_handler(httpd_req_t * req) {
   int e = activeevs;
   strcpy(myresponse, "");
   pfp = myresponse;
-  pfp += sprintf(pfp, "{\"ts\": \"%ld\",", evs[e].lastupd);
+  pfp += sprintf(pfp, "{\"ts\": \"%lld\",", evs[e].lastupd);
   pfp += sprintf(pfp, "\"temp\":\"%.2f\",", evs[e].temp);
   pfp += sprintf(pfp, "\"hum\":\"%.1f\",", evs[e].hum);
   pfp += sprintf(pfp, "\"pm010\":\"%.1f\",", evs[e].pm010);
@@ -265,7 +265,10 @@ esp_err_t post_adminaction(httpd_req_t * req) {
         .keep_alive_enable = true,
         .crt_bundle_attach = esp_crt_bundle_attach
     };
-    ret = esp_https_ota(&httpccfg);
+    esp_https_ota_config_t otacfg = {
+        .http_config = &httpccfg
+    };
+    ret = esp_https_ota(&otacfg);
     if (ret == ESP_OK) {
       ESP_LOGI("webserver.c", "OTA Succeed, Rebooting...");
       strcat(myresponse, "OTA Update reported success. Will reboot.");

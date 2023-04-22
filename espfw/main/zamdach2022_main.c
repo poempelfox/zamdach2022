@@ -9,6 +9,8 @@
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_mac.h>
+#include <esp_netif.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include <math.h>

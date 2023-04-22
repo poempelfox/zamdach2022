@@ -9,7 +9,7 @@
 // The wind direction sensor is connected to GPI35, which
 // equals ADC1_CH7
 #define WDPORT GPIO_NUM_35
-#define WDADCPORT ADC1_CHANNEL_7
+#define WDADCPORT ADC_CHANNEL_7
 
 void ws_init(void);
 

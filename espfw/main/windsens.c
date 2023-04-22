@@ -1,10 +1,11 @@
 
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
-#include "driver/adc.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp32/ulp.h"
 #include "ulp_main.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esp_log.h"
 #include "windsens.h"
 
@@ -47,7 +48,8 @@ static const uint16_t voltagemappingtable[16] = {
   VDCALC( 21880)  /*  337.5 deg 15      */
 };
 
-static esp_adc_cal_characteristics_t * adc_characteristics;
+static adc_cali_handle_t adc_calhan;
+static adc_oneshot_unit_handle_t ws_adchan;
 
 
 void ws_init(void)
@@ -63,16 +65,29 @@ void ws_init(void)
     ESP_ERROR_CHECK(ulp_run(&ulp_entry - RTC_SLOW_MEM));
 
     /* Initialize the ADC for the wind direction sensor */
-    adc_power_acquire();
-    adc1_config_width(ADC_WIDTH_BIT_12);
+    /* 12 bit width. */
     /* Maximum attenuation (11 dB) - gives full-scale voltage
      * of 3.9V for the ADC, instead of 1.1V, although it's not
      * good above 2.45V or below 0.15V
      * (src = ESP-IDF-documentation) and still must not exceed
      * the 3.3V pin maximum voltage  */
-    adc1_config_channel_atten(WDADCPORT, ADC_ATTEN_DB_11);
-    adc_characteristics = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_characteristics);
+    adc_oneshot_unit_init_cfg_t unitcfg = {
+      .unit_id = ADC_UNIT_1,
+      .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unitcfg, &ws_adchan));
+    adc_oneshot_chan_cfg_t chconf = {
+      .bitwidth = ADC_BITWIDTH_12,
+      .atten = ADC_ATTEN_DB_11
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(ws_adchan, WDADCPORT, &chconf));
+
+    adc_cali_line_fitting_config_t caliconfig = {
+      .unit_id = ADC_UNIT_1,
+      .atten = ADC_ATTEN_DB_11,
+      .bitwidth = ADC_BITWIDTH_12,
+    };
+    ESP_ERROR_CHECK(adc_cali_create_scheme_line_fitting(&caliconfig, &adc_calhan));
     for (int i = 0; i < 4; i++) {
       ESP_LOGI("windsens.c", "Voltagemapping-Table %d/4: %d %d %d %d.",
                 i+1, voltagemappingtable[i*4], voltagemappingtable[i*4+1],
@@ -91,8 +106,16 @@ uint8_t ws_readwinddirection(void)
 {
     uint8_t res = 99;
     uint16_t mindiff = 0xffff;
-    uint32_t adcv = adc1_get_raw(WDADCPORT);
-    uint32_t v = esp_adc_cal_raw_to_voltage(adcv, adc_characteristics);
+    int adcv;
+    if (adc_oneshot_read(ws_adchan, WDADCPORT, &adcv) != ESP_OK) {
+      ESP_LOGE("windsens.c", "adc_oneshot_read returned error!");
+      adcv = -9999.99;
+    }
+    int v;
+    if (adc_cali_raw_to_voltage(adc_calhan, adcv, &v) != ESP_OK) {
+      ESP_LOGE("windsens.c", "adc_cali_raw_to_voltage returned error!");
+      v = -9999.99;
+    }
     ESP_LOGI("windsens.c", "Wind vane raw voltage: %d (raw ADV: %d)", v, adcv);
     /* There is one special case: If voltage is way above the
      * expected maximum for the ADC, then apparently only the

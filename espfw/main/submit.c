@@ -24,7 +24,7 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     char post_data[400];
     sprintf(post_data, "{\n\"software_version\":\"0.1\",\n\"sensordatavalues\":[{\"value_type\":\"%s\",\"value\":\"%.3f\"}]}", valuetype, value);
     esp_http_client_config_t httpcc = {
-      .url = "http://wetter.poempelfox.de/api/pushmeasurement",
+      .url = "http://wetter.poempelfox.de/api/pushmeasurement/",
       .crt_bundle_attach = esp_crt_bundle_attach,
       .method = HTTP_METHOD_POST,
       .timeout_ms = 5000,
@@ -37,7 +37,7 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     esp_http_client_set_post_field(httpcl, post_data, strlen(post_data));
     esp_err_t err = esp_http_client_perform(httpcl);
     if (err == ESP_OK) {
-        ESP_LOGI("submit.c", "HTTP POST Status = %d, content_length = %d",
+        ESP_LOGI("submit.c", "HTTP POST Status = %d, content_length = %lld",
                       esp_http_client_get_status_code(httpcl),
                       esp_http_client_get_content_length(httpcl));
     } else {
@@ -86,7 +86,7 @@ int submit_to_opensensemap_multi(char * boxid, int arraysize, struct osm * array
     esp_http_client_set_post_field(httpcl, post_data, strlen(post_data));
     esp_err_t err = esp_http_client_perform(httpcl);
     if (err == ESP_OK) {
-        ESP_LOGI("submit.c", "HTTP POST Status = %d, content_length = %d",
+        ESP_LOGI("submit.c", "HTTP POST Status = %d, content_length = %lld",
                       esp_http_client_get_status_code(httpcl),
                       esp_http_client_get_content_length(httpcl));
     } else {
