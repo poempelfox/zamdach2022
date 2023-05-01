@@ -8,7 +8,7 @@
 #include "sdkconfig.h"
 #include "secrets.h"
 
-int submit_to_wpd(char * sensorid, char * valuetype, float value)
+int submit_to_wpd_multi(int arraysize, struct osm * aoosm)
 {
     int res = 0;
     if ((strcmp(ZAMDACH_WPDTOKEN, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM123456789") == 0)
@@ -16,13 +16,23 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
       ESP_LOGI("submit.c", "Not sending data to wetter.poempelfox.de because no valid token has been set.");
       return 1;
     }
-    if (strcmp(sensorid, "") == 0) {
-      ESP_LOGI("submit.c", "Not sending '%s' data to wetter.poempelfox.de because sensorid has not been set.", valuetype);
-      return 1;
+    for (int i = 0; i < arraysize; i++) {
+      if (strcmp(aoosm[i].sensorid, "") == 0) {
+        ESP_LOGI("submit.c", "Not sending data to wetter.poempelfox.de because sensorid has not been set in arrayelement %d of %d.", i, arraysize);
+        return 1;
+      }
     }
-    /* Send HTTP POST to wetter.poempelfox.de */
-    char post_data[400];
-    sprintf(post_data, "{\n\"software_version\":\"0.1\",\n\"sensordatavalues\":[{\"value_type\":\"%s\",\"value\":\"%.3f\"}]}", valuetype, value);
+    char post_data[500];
+    /* Build the contents of the HTTP POST we will
+     * send to wetter.poempelfox.de */
+    strcpy(post_data, "{\"software_version\":\"zamdach2022-0.1\",\"sensordatavalues\":[\n");
+    for (int i = 0; i < arraysize; i++) {
+      if (i != 0) { strcat(post_data, ",\n"); }
+      sprintf(&post_data[strlen(post_data)],
+              "{\"value_type\":\"%s\",\"value\":\"%.3f\"}",
+              aoosm[i].sensorid, aoosm[i].value);
+    }
+    strcat(post_data, "\n]}\n");
     esp_http_client_config_t httpcc = {
       .url = "http://wetter.poempelfox.de/api/pushmeasurement/",
       .crt_bundle_attach = esp_crt_bundle_attach,
@@ -32,7 +42,6 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     };
     esp_http_client_handle_t httpcl = esp_http_client_init(&httpcc);
     esp_http_client_set_header(httpcl, "Content-Type", "application/json");
-    esp_http_client_set_header(httpcl, "X-Pin", sensorid);
     esp_http_client_set_header(httpcl, "X-Sensor", ZAMDACH_WPDTOKEN);
     esp_http_client_set_post_field(httpcl, post_data, strlen(post_data));
     esp_err_t err = esp_http_client_perform(httpcl);
@@ -48,6 +57,18 @@ int submit_to_wpd(char * sensorid, char * valuetype, float value)
     return res;
 }
 
+int submit_to_wpd(char * sensorid, float value)
+{
+  struct osm aoosm[1];
+  if (strcmp(sensorid, "") == 0) {
+    ESP_LOGI("submit.c", "Not sending data to wetter.poempelfox.de because sensorid is not set.");
+    return 1;
+  }
+  aoosm[0].sensorid = sensorid;
+  aoosm[0].value = value;
+  return submit_to_wpd_multi(1, aoosm);
+}
+
 int submit_to_opensensemap_multi(char * boxid, int arraysize, struct osm * arrayofosm)
 {
     int res = 1;
@@ -58,7 +79,7 @@ int submit_to_opensensemap_multi(char * boxid, int arraysize, struct osm * array
       return 1;
     }
     /* Send HTTP POST to api.opensensemap.org */
-    char post_data[300];
+    char post_data[500];
     strcpy(post_data, "[");
     for (int i = 0; i < arraysize; i++) {
       if (strcmp(arrayofosm[i].sensorid, "") != 0) {
