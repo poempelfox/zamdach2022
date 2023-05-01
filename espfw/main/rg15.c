@@ -16,6 +16,7 @@ void rg15_init(void)
       .parity = UART_PARITY_DISABLE,
       .stop_bits = UART_STOP_BITS_1,
       .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+      .source_clk = UART_SCLK_DEFAULT,
     };
     // Configure UART parameters - we're using UART1.
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, 200, 200, 5, &rainsens_comm_handle, 0));
