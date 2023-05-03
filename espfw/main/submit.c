@@ -33,6 +33,7 @@ int submit_to_wpd_multi(int arraysize, struct osm * aoosm)
               aoosm[i].sensorid, aoosm[i].value);
     }
     strcat(post_data, "\n]}\n");
+    ESP_LOGI("submit.c", "wpd-payload: %d bytes: '%s'", strlen(post_data), post_data);
     esp_http_client_config_t httpcc = {
       .url = "http://wetter.poempelfox.de/api/pushmeasurement/",
       .crt_bundle_attach = esp_crt_bundle_attach,
