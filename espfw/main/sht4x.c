@@ -70,16 +70,16 @@ void sht4x_read(struct sht4xdata * d)
                                           readbuf, sizeof(readbuf),
                                           I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     if (res != ESP_OK) {
-      ESP_LOGI("sht4x.c", "ERROR: I2C-read from SHT4x failed.");
+      ESP_LOGE("sht4x.c", "ERROR: I2C-read from SHT4x failed.");
       return;
     }
     /* Check CRC */
     if (sht4x_crc(readbuf[0], readbuf[1]) != readbuf[2]) {
-      ESP_LOGI("sht4x.c", "ERROR: CRC-check for read part 1 failed.");
+      ESP_LOGE("sht4x.c", "ERROR: CRC-check for read part 1 failed.");
       return;
     }
     if (sht4x_crc(readbuf[3], readbuf[4]) != readbuf[5]) {
-      ESP_LOGI("sht4x.c", "ERROR: CRC-check for read part 2 failed.");
+      ESP_LOGE("sht4x.c", "ERROR: CRC-check for read part 2 failed.");
       return;
     }
     /* OK, CRC matches, this is looking good. */
@@ -98,6 +98,7 @@ void sht4x_read(struct sht4xdata * d)
 void sht4x_heatercycle(void)
 {
     uint8_t cmd[1] = { SHT4X_CMD_HEAT_MID_LONG };
+    ESP_LOGI("sht4x.c", "turning SHT4x heater on for 1.0 seconds at medium power (110 mW).");
     i2c_master_write_to_device(sht4xi2cport, SHT4XADDR,
                                cmd, sizeof(cmd),
                                I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
