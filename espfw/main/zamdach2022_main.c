@@ -37,7 +37,21 @@ static const char *TAG = "zamdach2022";
 char chipid[30] = "ZAMDACH-UNSET";
 struct ev evs[2];
 int activeevs = 0;
+/* Has the firmware been marked as "good" yet, or is ist still pending
+ * verification? */
 int pendingfwverify = 0;
+/* How often has the measured humidity been "too high"? */
+long too_wet_ctr = 0;
+/* And how many percent are "too high"? We use 90% because Sensiron uses
+ * that for "way too high" in its documentation, but it might be an idea to
+ * lower this to e.g. 80%. */
+#define TOOWETTHRESHOLD 90.0
+int forcesht4xheater = 0;
+/* If we turn on the heater, how many times in a row do we do it?
+ * We should do it a few times in short succession, to generate a large
+ * temperature delta, that is way better for removing creep than repeating
+ * a lower temperature delta more often. */
+#define HEATERITS 3
 
 double reducedairpressurecalc(double press)
 {
@@ -58,6 +72,7 @@ void app_main(void)
 {
     memset(evs, 0, sizeof(evs));
     time_t lastmeasts = 0;
+    time_t lastsht4xheat = 0;
     time_t lastaenomread = 0;
     /* Initialize the windsensor. This includes initializing the ULP
      * Co-processor, we let it count the number of signals received
@@ -173,6 +188,12 @@ void app_main(void)
 
         int naevs = (activeevs == 0) ? 1 : 0;
         evs[naevs].lastupd = lastmeasts;
+        /* The following is before we potentially turn on the heater and update
+         * lastsht4xheat on purpose: We will only turn on the heater AFTER the
+         * measurements, so it cannot affect that measurement, only the next
+         * one. And the whole point of that timestamp is to allow users to
+         * see whether a heating might have influenced the measurements. */
+        evs[naevs].lastsht4xheat = lastsht4xheat;
 
         /* We will now start to submit our measurements, so we need
          * a working network connection. Potentially wait for up to
@@ -230,6 +251,28 @@ void app_main(void)
         if (temphum.valid > 0) {
           ESP_LOGI(TAG, "Temperature: %.2f degC (raw: %x)", temphum.temp, temphum.tempraw);
           ESP_LOGI(TAG, "Humidity: %.2f %% (raw: %x)", temphum.hum, temphum.humraw);
+          if (temphum.hum >= TOOWETTHRESHOLD) { /* This will cause creep */
+            too_wet_ctr++;
+          }
+          /* creep mitigation through the integrated heater in the SHT4x.
+           * This is inside temphum.valid on purpose: If we cannot communicate
+           * with the sensor to read it, we probably cannot tell it to heat
+           * either... */
+          if (((too_wet_ctr > 60)
+            && (temphum.temp >= 4.0) && (temphum.temp <= 60.0)
+            && ((time(NULL) - lastsht4xheat) > 10))
+           || (forcesht4xheater > 0)) {
+            /* It has been very wet for a long time, temperature is suitable
+             * for heating, and heater has not been on in last 10 minutes.
+             * Or someone clicked on 'force heater on' in the Web-Interface. */
+            for (int i = 0; i < HEATERITS; i++) {
+              if (i != 0) { vTaskDelay(pdMS_TO_TICKS(1500)); }
+              sht4x_heatercycle();
+            }
+            lastsht4xheat = time(NULL);
+            too_wet_ctr -= 30;
+            forcesht4xheater = 0;
+          }
           struct osm thosm[2];
           thosm[0].sensorid = CONFIG_ZAMDACH_WPDSID_TEMPERATURE;
           thosm[0].value = temphum.temp;

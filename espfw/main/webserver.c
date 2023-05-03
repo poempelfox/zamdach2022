@@ -14,6 +14,8 @@ extern char chipid[30];
 extern struct ev evs[2];
 extern int activeevs;
 extern int pendingfwverify;
+extern long too_wet_ctr;
+extern int forcesht4xheater;
 
 static const char startp_p1[] = R"EOSP1(
 <!DOCTYPE html>
@@ -88,6 +90,7 @@ Admin-Password:
 <select name="action">
 <option value="flashupdate">Flash Firmware Update</option>
 <option value="reboot" selected>Reboot the Microcontroller</option>
+<option value="forcesht4xheater">Force SHT4x Heater On</option>
 )EOSP3";
 
 static const char startp_p4[] = R"EOSP4(
@@ -112,6 +115,7 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   strcpy(myresponse, startp_p1);
   pfp = myresponse + strlen(startp_p1);
   pfp += sprintf(pfp, "<table><tr><th>UpdateTS</th><td id=\"ts\">%lld</td></tr>", evs[e].lastupd);
+  pfp += sprintf(pfp, "<tr><th>LastSHT4xHeaterTS</th><td id=\"lastsht4xheat\">%lld</td></tr>", evs[e].lastsht4xheat);
   pfp += sprintf(pfp, "<tr><th>Temperature (C)</th><td id=\"temp\">%.2f</td></tr>", evs[e].temp);
   pfp += sprintf(pfp, "<tr><th>Humidity (%%)</th><td id=\"hum\">%.1f</td></tr>", evs[e].hum);
   pfp += sprintf(pfp, "<tr><th>PM 1.0 (&micro;g/m&sup3;)</th><td id=\"pm010\">%.1f</td></tr>", evs[e].pm010);
@@ -154,12 +158,13 @@ static httpd_uri_t uri_startpage = {
 };
 
 esp_err_t get_json_handler(httpd_req_t * req) {
-  char myresponse[1000];
+  char myresponse[1100];
   char * pfp;
   int e = activeevs;
   strcpy(myresponse, "");
   pfp = myresponse;
   pfp += sprintf(pfp, "{\"ts\": \"%lld\",", evs[e].lastupd);
+  pfp += sprintf(pfp, "\"lastsht4xheat\":\"%lld\"}", evs[e].lastsht4xheat);
   pfp += sprintf(pfp, "\"temp\":\"%.2f\",", evs[e].temp);
   pfp += sprintf(pfp, "\"hum\":\"%.1f\",", evs[e].hum);
   pfp += sprintf(pfp, "\"pm010\":\"%.1f\",", evs[e].pm010);
@@ -289,6 +294,12 @@ esp_err_t post_adminaction(httpd_req_t * req) {
     vTaskDelay(3 * (1000 / portTICK_PERIOD_MS)); 
     esp_restart();
     /* This should not be reached */
+  } else if (strcmp(tmp1, "forcesht4xheater") == 0) {
+    ESP_LOGI("webserver.c", "Forced SHT4x heating cycle requested by admin.");
+    forcesht4xheater = 1;
+    strcpy(myresponse, "OK, will do a SHT4x heating cycle after the next polling iteration.");
+    httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
   } else if (strcmp(tmp1, "markfwasgood") == 0) {
     if (pendingfwverify == 0) {
       httpd_resp_set_status(req, "400 Bad Request");

@@ -7,6 +7,7 @@
 /* This struct is used to provide data to us */
 struct ev {
   time_t lastupd;
+  time_t lastsht4xheat;
   float hum;
   float lux;
   float pm010;
