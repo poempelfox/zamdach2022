@@ -6,6 +6,7 @@
 #include <esp_http_client.h>
 #include <esp_https_ota.h>
 #include <esp_crt_bundle.h>
+#include <esp_netif.h>
 #include "webserver.h"
 #include "secrets.h"
 
@@ -16,6 +17,8 @@ extern int activeevs;
 extern int pendingfwverify;
 extern long too_wet_ctr;
 extern int forcesht4xheater;
+/* This is in network.c */
+extern esp_netif_t * mainnetif;
 
 static const char startp_p1[] = R"EOSP1(
 <!DOCTYPE html>
@@ -193,6 +196,45 @@ static httpd_uri_t uri_json = {
   .user_ctx = NULL
 };
 
+esp_err_t get_publicdebug_handler(httpd_req_t * req) {
+  char myresponse[1100];
+  char * pfp;
+  strcpy(myresponse, "");
+  pfp = myresponse;
+  pfp += sprintf(pfp, "<html><head><title>Debug info (public part)</title></head><body>");
+  pfp += sprintf(pfp, "too_wet_ctr: %ld<br>", too_wet_ctr);
+  pfp += sprintf(pfp, "chipid: %s<br>", chipid);
+  esp_netif_ip_info_t ip_info;
+  if (esp_netif_get_ip_info(mainnetif, &ip_info) == ESP_OK) {
+    pfp += sprintf(pfp, "My IP addresses:<br><ul>");
+    pfp += sprintf(pfp, "<li>IPv4: " IPSTR "/" IPSTR " GW " IPSTR "</li>",
+                   IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
+                   IP2STR(&ip_info.gw));
+    esp_ip6_addr_t v6addrs[10]; /* FIXME: there probably is a define that gives the maximum size of this array... */
+    int nv6ips = esp_netif_get_all_ip6(mainnetif, v6addrs);
+    for (int i = 0; i < nv6ips; i++) {
+      pfp += sprintf(pfp, "<li>IPv6: " IPV6STR "</li>",
+             IPV62STR(v6addrs[i]));
+    }
+    pfp += sprintf(pfp, "</ul>");
+  } else {
+    pfp += sprintf(pfp, "Failed to get IP address information :(<br>");
+  }
+  /* The following line is the default und thus redundant. */
+  httpd_resp_set_status(req, "200 OK");
+  httpd_resp_set_type(req, "text/html");
+  httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=29");
+  httpd_resp_send(req, myresponse, HTTPD_RESP_USE_STRLEN);
+  return ESP_OK;
+}
+
+static httpd_uri_t uri_debug = {
+  .uri      = "/debug",
+  .method   = HTTP_GET,
+  .handler  = get_publicdebug_handler,
+  .user_ctx = NULL
+};
+
 /* Unescapes a x-www-form-urlencoded string.
  * Modifies the string inplace! */
 void unescapeuestring(char * s) {
@@ -350,6 +392,7 @@ void webserver_start(void) {
   }
   httpd_register_uri_handler(server, &uri_startpage);
   httpd_register_uri_handler(server, &uri_json);
+  httpd_register_uri_handler(server, &uri_debug);
   httpd_register_uri_handler(server, &uri_adminaction);
 }
 

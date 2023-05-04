@@ -17,11 +17,12 @@ extern char chipid[30];
 
 EventGroupHandle_t network_event_group;
 
-#ifndef CONFIG_ZAMDACH_USEWIFI
 /* We need to make this a global variable, because the eth_event_handler
- * needs it to set options for DHCP6. */
+ * needs it to set options for DHCP6, and because we use it to print our
+ * IPs in webserver.c. */
 esp_netif_t * mainnetif = NULL;
 
+#ifndef CONFIG_ZAMDACH_USEWIFI
 /** Event handler for Ethernet events */
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
                               int32_t event_id, void *event_data)
@@ -134,7 +135,7 @@ void network_prepare(void)
 {
     network_event_group = xEventGroupCreate();
 #ifdef CONFIG_ZAMDACH_USEWIFI
-    esp_netif_create_default_wifi_sta(); /* This seems to return a completely useless structure */
+    mainnetif = esp_netif_create_default_wifi_sta();
     wifi_init_config_t wicfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wicfg));
     // Register user defined event handers
