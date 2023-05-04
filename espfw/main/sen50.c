@@ -83,24 +83,24 @@ void sen50_read(struct sen50data * d)
                                           readbuf, sizeof(readbuf),
                                           I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     if (res != ESP_OK) {
-      ESP_LOGI("sen50.c", "ERROR: I2C-read from SEN50 failed.");
+      ESP_LOGE("sen50.c", "ERROR: I2C-read from SEN50 failed.");
       return;
     }
     /* Check CRC */
     if (sen50_crc(readbuf[0], readbuf[1]) != readbuf[2]) {
-      ESP_LOGI("sen50.c", "ERROR: CRC-check for read part 1 failed.");
+      ESP_LOGE("sen50.c", "ERROR: CRC-check for read part 1 failed.");
       return;
     }
     if (sen50_crc(readbuf[3], readbuf[4]) != readbuf[5]) {
-      ESP_LOGI("sen50.c", "ERROR: CRC-check for read part 2 failed.");
+      ESP_LOGE("sen50.c", "ERROR: CRC-check for read part 2 failed.");
       return;
     }
     if (sen50_crc(readbuf[6], readbuf[7]) != readbuf[8]) {
-      ESP_LOGI("sen50.c", "ERROR: CRC-check for read part 3 failed.");
+      ESP_LOGE("sen50.c", "ERROR: CRC-check for read part 3 failed.");
       return;
     }
     if (sen50_crc(readbuf[9], readbuf[10]) != readbuf[11]) {
-      ESP_LOGI("sen50.c", "ERROR: CRC-check for read part 4 failed.");
+      ESP_LOGE("sen50.c", "ERROR: CRC-check for read part 4 failed.");
       return;
     }
     /* We could also check CRC for temperature / humidity / noxi data, but

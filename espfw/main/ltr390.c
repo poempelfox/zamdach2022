@@ -145,7 +145,7 @@ double ltr390_readuv(void)
       repctr++;
     } while ((isvalid != 1) && (repctr < 10));
     if (isvalid != 1) {
-      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (3).");
+      ESP_LOGE("ltr390.c", "ERROR: I2C-read from LTR390 failed (3).");
       return -1.0;
     }
     rtr = LTR390_REG_UVSDATAL;
@@ -156,7 +156,7 @@ double ltr390_readuv(void)
     }
     if (isvalid != 1) {
       /* Read error, signal that we received nonsense by returning a negative UV index */
-      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (4).");
+      ESP_LOGE("ltr390.c", "ERROR: I2C-read from LTR390 failed (4).");
       return -1.0;
     }
     uint32_t uvsr32 = ((uint32_t)(uvsreg[2] & 0x0F) << 16)
@@ -201,7 +201,7 @@ double ltr390_readal(void)
       repctr++;
     } while ((isvalid != 1) && (repctr < 10));
     if (isvalid != 1) {
-      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (1).");
+      ESP_LOGE("ltr390.c", "ERROR: I2C-read from LTR390 failed (1).");
       return -1.0;
     }
     rtr = LTR390_REG_ALSDATAL;
@@ -212,7 +212,7 @@ double ltr390_readal(void)
     }
     if (isvalid != 1) {
       /* Read error, signal that we received nonsense by returning a negative UV index */
-      ESP_LOGI("ltr390.c", "ERROR: I2C-read from LTR390 failed (2).");
+      ESP_LOGE("ltr390.c", "ERROR: I2C-read from LTR390 failed (2).");
       return -1.0;
     }
     uint32_t alsr32 = ((uint32_t)(alsreg[2] & 0x0F) << 16)
