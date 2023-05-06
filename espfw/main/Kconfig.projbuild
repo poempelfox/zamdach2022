@@ -18,15 +18,6 @@ menu "ZAMDACH2022 Configuration"
                 Do not forget to set the secret (password) as well,
                 you need to do that in secrets.h, not here.
 
-        config ZAMDACH_DOPOWERSAVE
-            bool "Try to do powersaving"
-            default y
-            help
-                Conserves power by turning off the WiFi when
-                not sending and going to a sleep mode. The
-                downside of this is that we then cannot run
-                the webinterface or do OTA firmware updates.
-
     endif # ZAMDACH_USEWIFI
 
     config ZAMDACH_WPDSID_HUMIDITY

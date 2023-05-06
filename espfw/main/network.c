@@ -151,12 +151,10 @@ void network_prepare(void)
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wccfg));
-#ifndef CONFIG_ZAMDACH_DOPOWERSAVE
-    /* If we don't try to do powersaving, we just keep
-     * connected all the time, so connect now. */
+    /* We just try to keep connected all the time,
+     * so connect now. */
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_connect());
-#endif /* ! CONFIG_ZAMDACH_DOPOWERSAVE */
 #else /* !CONFIG_ZAMDACH_USEWIFI - we use ethernet */
     // Create new default instance of esp-netif for Ethernet
     esp_netif_config_t nicfg = ESP_NETIF_DEFAULT_ETH();
@@ -196,27 +194,5 @@ void network_prepare(void)
     /* start Ethernet driver state machine */
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 #endif /* !CONFIG_ZAMDACH_USEWIFI */
-}
-
-void network_on(void)
-{
-#ifdef CONFIG_ZAMDACH_DOPOWERSAVE
-#ifdef CONFIG_ZAMDACH_USEWIFI
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_connect());
-#else /* !CONFIG_ZAMDACH_USEWIFI - we use ethernet */
-#endif /* !CONFIG_ZAMDACH_USEWIFI */
-#endif /* CONFIG_ZAMDACH_DOPOWERSAVE */
-}
-
-void network_off(void)
-{
-#ifdef CONFIG_ZAMDACH_DOPOWERSAVE
-#ifdef CONFIG_ZAMDACH_USEWIFI
-    xEventGroupClearBits(network_event_group, NETWORK_CONNECTED_BIT);
-    ESP_ERROR_CHECK(esp_wifi_stop());
-#else /* !CONFIG_ZAMDACH_USEWIFI - we use ethernet */
-#endif /* !CONFIG_ZAMDACH_USEWIFI */
-#endif /* CONFIG_ZAMDACH_DOPOWERSAVE */
 }
 

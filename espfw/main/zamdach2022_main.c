@@ -115,14 +115,11 @@ void app_main(void)
     sen50_startmeas(); /* FIXME Perhaps we don't want this on all the time. */
     sht4x_init(1);
 
-#ifndef CONFIG_ZAMDACH_DOPOWERSAVE
-    /* Unless we're trying to do powersaving, we do NTP
-     * to provide useful timestamps in our webserver output. */
+    /* We do NTP to provide useful timestamps in our webserver output. */
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, "ntp2.fau.de");
     sntp_setservername(1, "ntp3.fau.de");
     sntp_init();
-#endif /* !CONFIG_ZAMDACH_DOPOWERSAVE */
 
     /* In case we were OTA-updating, we set this fact in a variable for the
      * webserver. Someone will need to click "Keep this firmware" in the
@@ -164,8 +161,6 @@ void app_main(void)
         /* Read UV index and switch to ambient light measurement */
         float uvind = ltr390_readuv();
         ltr390_startalmeas();
-
-        network_on(); /* Turn network on, i.e. connect to WiFi. This happens in the background. */
 
         /* slight delay to allow the RG15 to reply */
         vTaskDelay(pdMS_TO_TICKS(1111));
@@ -344,20 +339,10 @@ void app_main(void)
         /* Now mark the updated values as the current ones for the webserver */
         activeevs = naevs;
 
-        network_off();
         long howmuchtosleep = (lastmeasts + 60) - time(NULL) - 1;
         if ((howmuchtosleep < 0) || (howmuchtosleep > 60)) { howmuchtosleep = 60; }
-#ifdef CONFIG_ZAMDACH_DOPOWERSAVE
-        ESP_LOGI(TAG, "will now enter sleep mode for %ld seconds", howmuchtosleep);
-        if (howmuchtosleep > 0) {
-          /* This is given in microseconds */
-          esp_sleep_enable_timer_wakeup(howmuchtosleep * (int64_t)1000000);
-          esp_light_sleep_start();
-        }
-#else /* !CONFIG_ZAMDACH_DOPOWERSAVE - do not attempt to sleep */
-        ESP_LOGI(TAG, "will now wait for %ld seconds (powersave not possible or disabled)", howmuchtosleep);
+        ESP_LOGI(TAG, "will now wait for %ld seconds before doing the next update", howmuchtosleep);
         vTaskDelay(pdMS_TO_TICKS(howmuchtosleep * 1000));
-#endif /* !CONFIG_ZAMDACH_DOPOWERSAVE */
       } else { // Delay for a short time
         vTaskDelay(pdMS_TO_TICKS(1000));
       }
