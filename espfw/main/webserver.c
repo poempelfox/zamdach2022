@@ -166,8 +166,8 @@ esp_err_t get_json_handler(httpd_req_t * req) {
   int e = activeevs;
   strcpy(myresponse, "");
   pfp = myresponse;
-  pfp += sprintf(pfp, "{\"ts\": \"%lld\",", evs[e].lastupd);
-  pfp += sprintf(pfp, "\"lastsht4xheat\":\"%lld\"}", evs[e].lastsht4xheat);
+  pfp += sprintf(pfp, "{\"ts\":\"%lld\",", evs[e].lastupd);
+  pfp += sprintf(pfp, "\"lastsht4xheat\":\"%lld\",", evs[e].lastsht4xheat);
   pfp += sprintf(pfp, "\"temp\":\"%.2f\",", evs[e].temp);
   pfp += sprintf(pfp, "\"hum\":\"%.1f\",", evs[e].hum);
   pfp += sprintf(pfp, "\"pm010\":\"%.1f\",", evs[e].pm010);
@@ -205,21 +205,21 @@ esp_err_t get_publicdebug_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "too_wet_ctr: %ld<br>", too_wet_ctr);
   pfp += sprintf(pfp, "chipid: %s<br>", chipid);
   esp_netif_ip_info_t ip_info;
+  pfp += sprintf(pfp, "My IP addresses:<br><ul>");
   if (esp_netif_get_ip_info(mainnetif, &ip_info) == ESP_OK) {
-    pfp += sprintf(pfp, "My IP addresses:<br><ul>");
     pfp += sprintf(pfp, "<li>IPv4: " IPSTR "/" IPSTR " GW " IPSTR "</li>",
                    IP2STR(&ip_info.ip), IP2STR(&ip_info.netmask),
                    IP2STR(&ip_info.gw));
-    esp_ip6_addr_t v6addrs[10]; /* FIXME: there probably is a define that gives the maximum size of this array... */
-    int nv6ips = esp_netif_get_all_ip6(mainnetif, v6addrs);
-    for (int i = 0; i < nv6ips; i++) {
-      pfp += sprintf(pfp, "<li>IPv6: " IPV6STR "</li>",
-             IPV62STR(v6addrs[i]));
-    }
-    pfp += sprintf(pfp, "</ul>");
   } else {
-    pfp += sprintf(pfp, "Failed to get IP address information :(<br>");
+    pfp += sprintf(pfp, "<li>Failed to get IPv4 address information :(</li>");
   }
+  esp_ip6_addr_t v6addrs[CONFIG_LWIP_IPV6_NUM_ADDRESSES + 5];
+  int nv6ips = esp_netif_get_all_ip6(mainnetif, v6addrs);
+  for (int i = 0; i < nv6ips; i++) {
+    pfp += sprintf(pfp, "<li>IPv6: " IPV6STR "</li>",
+           IPV62STR(v6addrs[i]));
+  }
+  pfp += sprintf(pfp, "</ul>");
   /* The following line is the default und thus redundant. */
   httpd_resp_set_status(req, "200 OK");
   httpd_resp_set_type(req, "text/html");
