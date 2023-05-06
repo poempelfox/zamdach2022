@@ -59,7 +59,7 @@ function updrcvd(err, data) {
   } else {
     for (let k in data) {
       if (document.getElementById(k) != null) {
-        if (k === "ts") {
+        if ((k === "ts") || (k === "lastsht4xheat")) {
           var jsts = new Date(data[k] * 1000);
           document.getElementById(k).innerHTML = data[k] + " (" + jsts.toISOString() + ")";
         } else {
