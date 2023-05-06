@@ -2,8 +2,7 @@
 #ifndef _WINDSENS_H_
 #define _WINDSENS_H_
 
-// The wind speed sensor is connected to GPI34, which equals
-// RTC_GPIO4.
+// The wind speed sensor is connected to GPI34
 #define WSPORT GPIO_NUM_34
 
 // The wind direction sensor is connected to GPI35, which
@@ -15,6 +14,11 @@ void ws_init(void);
 
 /* 1 count per second would equal 2.4 km/h wind speed */
 uint16_t ws_readaenometer(void);
+
+/* This returns the peak wind speed seen since the last
+ * call of this function (meaning this also resets the
+ * reading). */
+float ws_readpeakws(void);
 
 /* This returns a value between 0 and 15, or 99 on error.
  * 0 is North (0 degrees), and it goes clockwise from there

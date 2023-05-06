@@ -1,21 +1,15 @@
 
-#include "driver/gpio.h"
-#include "driver/rtc_io.h"
-#include "esp_adc/adc_oneshot.h"
-#include "esp32/ulp.h"
-#include "ulp_main.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
-#include "esp_log.h"
+#include <driver/gpio.h>
+#include <driver/rtc_io.h>
+#include <esp_adc/adc_oneshot.h>
+#include <esp_adc/adc_cali.h>
+#include <esp_adc/adc_cali_scheme.h>
+#include <esp_log.h>
+#include <esp_timer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <sys/time.h>
 #include "windsens.h"
-
-/* the binary blob we load into the ULP.
- * (The ULP code gets compiled automatically during the build process and
- * the binary will be embedded into the firmware image we flash onto the
- * ESP as well, but it needs to be loaded into the ULP by the main
- * application at runtime) */
-extern const uint8_t ulp_main_bin_start[] asm("_binary_ulp_main_bin_start");
-extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
 
 /* See the docs/ directory for instructions on how to wire up the
  * wind sensor assembly */
@@ -51,18 +45,96 @@ static const uint16_t voltagemappingtable[16] = {
 static adc_cali_handle_t adc_calhan;
 static adc_oneshot_unit_handle_t ws_adchan;
 
+static portMUX_TYPE wsspinlock = portMUX_INITIALIZER_UNLOCKED;
+static long wscounter = 0;
+static int lastwsstate = 1;
+static int64_t lastwsts = -1;
+static int64_t minwstsdiff = -1;
+static int64_t wsactualevts = 0;
+static esp_timer_handle_t ws_wstimer;
+
+static int64_t gethighrests(void)
+{
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  int64_t res = (int64_t)t.tv_sec * 1000000LL + (int64_t)t.tv_usec;
+  return res;
+}
+
+void ws_windspeedtimercb(void * arg)
+{
+  int curwsstate = gpio_get_level(WSPORT);
+  lastwsstate = curwsstate;
+  if (curwsstate == 0) { /* We were pulled low, so the aenometer made 1/3 turn */
+    int64_t curwsts = wsactualevts;
+    taskENTER_CRITICAL_ISR(&wsspinlock);
+    wscounter++;
+    /* We probably should not use float here, because ESP-IDF does
+     * not always save floating point registers when context-switching.
+     * So instead we just save the minimum timestamp difference to
+     * calculate the peak windspeed later (outside of interrupt context). */
+    if (lastwsts > 0) {
+      int64_t tsdiff = curwsts - lastwsts;
+      if (tsdiff > 0) {
+        if ((minwstsdiff < 0) || (tsdiff < minwstsdiff)) {
+          /* This is a new minimum */
+          minwstsdiff = tsdiff;
+        }
+      }
+    }
+    taskEXIT_CRITICAL_ISR(&wsspinlock);
+    lastwsts = curwsts;
+  }
+}
+
+void ws_windspeedirq(void * arg)
+{
+  // n.b.: We must not LOG in irq context
+  /* We're doing debouncing by scheduling a timer. Only if when the
+   * timer runs the pin status still is changed, we process it. */
+  int curwsstate = gpio_get_level(WSPORT);
+  if (curwsstate == lastwsstate) { /* No change? Then there is nothing to do. */
+    /* Cancel any potentially pending timer */
+    esp_timer_stop(ws_wstimer);
+  } else {
+    /* Save the timestamp at which the event ACTUALLY occoured so
+     * the timer routine can later get it... */
+    wsactualevts = gethighrests();
+    /* FIXME: is 1000 us a good value? */
+    esp_timer_start_once(ws_wstimer, 1000);
+  }
+}
 
 void ws_init(void)
 {
-    /* Initialize the GPIO for the wind speed sensor
-     * and the ULP that will process the pin changes from that GPIO. */
-    rtc_gpio_init(GPIO_NUM_34);
-    rtc_gpio_set_direction(GPIO_NUM_34, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_dis(GPIO_NUM_34);
-    rtc_gpio_pulldown_dis(GPIO_NUM_34);
-    ESP_ERROR_CHECK(ulp_load_binary(0, ulp_main_bin_start,
-            (ulp_main_bin_end - ulp_main_bin_start) / sizeof(uint32_t)));
-    ESP_ERROR_CHECK(ulp_run(&ulp_entry - RTC_SLOW_MEM));
+    /* Initialize the GPIO for the wind speed sensor */
+    /* The wind speed sensor is connected to GPI34.
+     * That pin is also connected to the button on the ESP32-POE-ISO,
+     * and pulled high by a 10k resistor on the board.
+     * Thus, we should normally read a "1" on the GPIO, and it
+     * will temporarily be pulled to 0 on every 1/3rd of an
+     * aenometer rotation. */
+    esp_timer_create_args_t tca = {
+      .callback = ws_windspeedtimercb,
+      .arg = NULL,
+      .name = "windspeeddebouncetimer",
+      .dispatch_method = ESP_TIMER_TASK,
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&tca, &ws_wstimer));
+    esp_err_t iise = gpio_install_isr_service(ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_EDGE);
+    if ((iise != ESP_OK) && (iise != ESP_ERR_INVALID_STATE)) {
+      ESP_LOGE("windsens.c", "gpio_install_isr_service returned an error. Interrupts will not work. Wind speed cannot be measured.");
+    } else {
+      ESP_ERROR_CHECK(gpio_isr_handler_add(WSPORT, ws_windspeedirq, NULL));
+    }
+    gpio_config_t wss = {
+      .pin_bit_mask = (1ULL << WSPORT),
+      .mode = GPIO_MODE_INPUT,
+      .pull_up_en = 0,
+      .pull_down_en = 0,
+      .intr_type = GPIO_INTR_ANYEDGE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&wss));
 
     /* Initialize the ADC for the wind direction sensor */
     /* 12 bit width. */
@@ -97,8 +169,23 @@ void ws_init(void)
 
 uint16_t ws_readaenometer(void)
 {
-    uint16_t res = (ulp_windsenscounter & 0xffff);
-    ulp_windsenscounter = 0;
+    taskENTER_CRITICAL(&wsspinlock);
+    uint16_t res = wscounter;
+    wscounter = 0;
+    taskEXIT_CRITICAL(&wsspinlock);
+    return res;
+}
+
+float ws_readpeakws(void)
+{
+    taskENTER_CRITICAL(&wsspinlock);
+    int64_t td = minwstsdiff;
+    minwstsdiff = -1;
+    taskEXIT_CRITICAL(&wsspinlock);
+    float res = 0.0;
+    if (td > 0) {
+      res = (1000000.0 / (double)td) * 2.4;
+    }
     return res;
 }
 
