@@ -199,7 +199,7 @@ static httpd_uri_t uri_json = {
 };
 
 esp_err_t get_publicdebug_handler(httpd_req_t * req) {
-  char myresponse[1100];
+  char myresponse[2000];
   char * pfp;
   strcpy(myresponse, "");
   pfp = myresponse;
@@ -222,6 +222,7 @@ esp_err_t get_publicdebug_handler(httpd_req_t * req) {
            IPV62STR(v6addrs[i]));
   }
   pfp += sprintf(pfp, "</ul>");
+  pfp += sprintf(pfp, "Last reset reason: %d<br>", esp_reset_reason());
   /* The following line is the default und thus redundant. */
   httpd_resp_set_status(req, "200 OK");
   httpd_resp_set_type(req, "text/html");
