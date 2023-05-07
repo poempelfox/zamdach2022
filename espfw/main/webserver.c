@@ -61,7 +61,7 @@ function updrcvd(err, data) {
       if (document.getElementById(k) != null) {
         if ((k === "ts") || (k === "lastsht4xheat")) {
           var jsts = new Date(data[k] * 1000);
-          document.getElementById(k).innerHTML = data[k] + " (" + jsts.toISOString() + ")";
+          document.getElementById(k).innerHTML = data[k] + " (" + ((data[k] == 0) ? "NEVER" : jsts.toISOString()) + ")";
         } else {
           document.getElementById(k).innerHTML = data[k];
         }
