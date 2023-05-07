@@ -151,6 +151,13 @@ void app_main(void)
     }
 
     while (1) {
+      if (lastmeasts > time(NULL)) { /* This should not be possible, but we've
+         * seen time(NULL) temporarily report insane timestamps far in the
+         * future - not sure why, possibly after a watchdog reset, but in any
+         * case, lets try to work around it: */
+        ESP_LOGE(TAG, "Lets do the time warp again: Time jumped backwards - trying to cope.");
+        lastmeasts = time(NULL); // We should return to normal measurements in 60s
+      }
       if (((time(NULL) - lastmeasts) >= 60)
         || (lastmeasts == 0)) { /* time() starts at 0 on startup, so we need this special case. */
         lastmeasts = time(NULL);
