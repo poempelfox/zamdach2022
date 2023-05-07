@@ -53,16 +53,9 @@ static int64_t minwstsdiff = -1;
 static int64_t wsactualevts = 0;
 static esp_timer_handle_t ws_wstimer;
 
-static int64_t gethighrests(void)
-{
-  struct timeval t;
-  gettimeofday(&t, NULL);
-  int64_t res = (int64_t)t.tv_sec * 1000000LL + (int64_t)t.tv_usec;
-  return res;
-}
-
 void ws_windspeedtimercb(void * arg)
 {
+  // n.b.: We must not LOG in irq context
   int curwsstate = gpio_get_level(WSPORT);
   lastwsstate = curwsstate;
   if (curwsstate == 0) { /* We were pulled low, so the aenometer made 1/3 turn */
@@ -99,7 +92,7 @@ void ws_windspeedirq(void * arg)
   } else {
     /* Save the timestamp at which the event ACTUALLY occoured so
      * the timer routine can later get it... */
-    wsactualevts = gethighrests();
+    wsactualevts = esp_timer_get_time();
     /* FIXME: is 1000 us a good value? */
     esp_timer_start_once(ws_wstimer, 1000);
   }
@@ -117,11 +110,11 @@ void ws_init(void)
     esp_timer_create_args_t tca = {
       .callback = ws_windspeedtimercb,
       .arg = NULL,
-      .name = "windspeeddebouncetimer",
+      .name = "wsdebouncetimer",
       .dispatch_method = ESP_TIMER_TASK,
     };
     ESP_ERROR_CHECK(esp_timer_create(&tca, &ws_wstimer));
-    esp_err_t iise = gpio_install_isr_service(ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_EDGE);
+    esp_err_t iise = gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1 | ESP_INTR_FLAG_EDGE);
     if ((iise != ESP_OK) && (iise != ESP_ERR_INVALID_STATE)) {
       ESP_LOGE("windsens.c", "gpio_install_isr_service returned an error. Interrupts will not work. Wind speed cannot be measured.");
     } else {
