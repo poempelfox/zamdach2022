@@ -130,6 +130,7 @@ esp_err_t get_startpage_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "<tr><th>UV-Index</th><td id=\"uvind\">%.2f</td></tr>", evs[e].uvind);
   pfp += sprintf(pfp, "<tr><th>Rain (mm/min)</th><td id=\"raing\">%.2f</td></tr>", evs[e].raing);
   pfp += sprintf(pfp, "<tr><th>Wind speed (km/h)</th><td id=\"windspeed\">%.1f</td></tr>", evs[e].windspeed);
+  pfp += sprintf(pfp, "<tr><th>Wind speed max / gusts (km/h)</th><td id=\"windspmax\">%.1f</td></tr>", evs[e].windspmax);
   pfp += sprintf(pfp, "<tr><th>Wind direction</th><td id=\"winddirtxt\">%s</td></tr>", evs[e].winddirtxt);
   pfp += sprintf(pfp, "</table>");
   const esp_app_desc_t * appd = esp_app_get_description();
@@ -179,6 +180,7 @@ esp_err_t get_json_handler(httpd_req_t * req) {
   pfp += sprintf(pfp, "\"uvind\":\"%.2f\",", evs[e].uvind);
   pfp += sprintf(pfp, "\"raing\":\"%.2f\",", evs[e].raing);
   pfp += sprintf(pfp, "\"windspeed\":\"%.1f\",", evs[e].windspeed);
+  pfp += sprintf(pfp, "\"windspmax\":\"%.1f\",", evs[e].windspmax);
   pfp += sprintf(pfp, "\"winddirdeg\":\"%.1f\",", evs[e].winddirdeg);
   pfp += sprintf(pfp, "\"winddirtxt\":\"%s\"}", evs[e].winddirtxt);
   /* The following line is the default und thus redundant. */

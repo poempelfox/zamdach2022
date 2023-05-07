@@ -222,12 +222,23 @@ void app_main(void)
           int tsdif = curaenomread - lastaenomread;
           /* calculate Wind Speed in km/h from the number of impulses and the timestamp difference */
           float windspeed = 2.4 * wsctr / tsdif;
-          ESP_LOGI(TAG, "Wind speed: %.1f km/h", windspeed);
-          submit_to_wpd(CONFIG_ZAMDACH_WPDSID_WINDSPEED, windspeed);
-          submit_to_opensensemap(CONFIG_ZAMDACH_OSM_BOXID, CONFIG_ZAMDACH_OSMSID_WINDSPEED, windspeed);
+          float peakws = ws_readpeakws();
+          ESP_LOGI(TAG, "Wind speed: %.2f km/h, Peak: %.2f km/h", windspeed, peakws);
+          struct osm wsosm[2];
+          wsosm[0].sensorid = CONFIG_ZAMDACH_WPDSID_WINDSPEED;
+          wsosm[0].value = windspeed;
+          wsosm[1].sensorid = CONFIG_ZAMDACH_WPDSID_WINDSPMAX;
+          wsosm[1].value = peakws;
+          submit_to_wpd_multi(2, wsosm);
+          /* We just reuse the struct, overwriting just the sensorid. */
+          wsosm[0].sensorid = CONFIG_ZAMDACH_OSMSID_WINDSPEED;
+          wsosm[1].sensorid = CONFIG_ZAMDACH_OSMSID_WINDSPMAX;
+          submit_to_opensensemap_multi(CONFIG_ZAMDACH_OSM_BOXID, 2, wsosm);
           evs[naevs].windspeed = windspeed;
+          evs[naevs].windspmax = peakws;
         } else {
           evs[naevs].windspeed = NAN;
+          evs[naevs].windspmax = NAN;
         }
         lastaenomread = curaenomread;
 

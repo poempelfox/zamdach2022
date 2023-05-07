@@ -19,6 +19,7 @@ struct ev {
   float temp;
   float uvind;
   float windspeed;
+  float windspmax;
   float winddirdeg;
   char winddirtxt[8];
 };

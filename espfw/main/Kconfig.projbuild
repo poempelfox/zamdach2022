@@ -69,6 +69,13 @@ menu "ZAMDACH2022 Configuration"
             The ID of the aenometer (wind speed) sensor for reporting
             to wetter.poempelfox.de
 
+    config ZAMDACH_WPDSID_WINDSPMAX
+        string "wetter.p.d ID for the aenometer (max. wind speed)"
+        default "77"
+        help
+            The ID of the aenometer (maximum wind speed) sensor for reporting
+            to wetter.poempelfox.de
+
     config ZAMDACH_WPDSID_ILLUMINANCE
         string "wetter.p.d ID for the illuminance sensor"
         default "24"
@@ -157,6 +164,13 @@ menu "ZAMDACH2022 Configuration"
         default "63b83dcc6795ba0007794c97"
         help
             The ID of the aenometer (wind speed) sensor for reporting
+            to opensensemap.org
+
+    config ZAMDACH_OSMSID_WINDSPMAX
+        string "opensensemap sensor-ID for the aenometer (max. wind speed)"
+        default ""
+        help
+            The ID of the aenometer (maximum wind speed) sensor for reporting
             to opensensemap.org
 
     config ZAMDACH_OSMSID_ILLUMINANCE
