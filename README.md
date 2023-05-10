@@ -30,7 +30,7 @@ It sticks out a bit further than the solar panels.
 
 Most sensors were mounted in two "┌┐" and one "└┐" made from 90° drainage pipe bends.
 This is the same mounting-technique used by the luftdaten.info project to have cheap but relatively reliable weather protection.
-The drainage pipe thingies are then held by pipe clamps screwed onto the side of the "U" aliminium tube.
+The drainage pipe thingies are then held by pipe clamps screwed onto the side of the "U" aluminium tube.
 
 The drainage-pipe-housing where one side faces up is the one housing the ambient light / UV-Index-sensor.
 The side facing up has a petri-dish made from borosilicate on it, glued on and sealed with some special (extra-large temperature range) glue we found laying around in the ZAM.
@@ -71,6 +71,12 @@ Unfortunately, the following features were not implemented before the sensor
 was mounted on the roof, but they still should be added - and we can do updates
 through the webinterface of the sensor, though it is a bit risky...
 
-* Automatically turn on the heater on the SHT41 after extended periods of extremely high humidity
-* send data not only to wetter.poempelfox.de but also to madavi and sensor.community
-* not only measure average wind speed over 1 minute but also peak wind speed.
+- [ ] Use the heater on the SHT41 to prevent creep (humidity buildup inside the sensor so it will permanently show too high humidity values)
+  + [X] Automatically turn on the heater on the SHT41 after extended periods of extremely high humidity
+  + [ ] fine-tune the heating parameters (when, how often, how long) so it doesn't interfere with measurements too much.
+- [ ] send data not only to wetter.poempelfox.de but also to other APIs
+  + [X] OpenSenseMap
+  + [ ] madavi - see comment at sensor.community
+  + [ ] sensor.community. I'm having doubts about this, because they seem to be sending mixed signals. On the one hand, they seem to want to collect data from as many useful sensors as possible. On the other hand, you nowadays actually have to lie to the API that you are one of their sensors to get it to accept data from you. foxstaub2018 used to submit data there, until they randomly decided to no longer accept the measurements because it wasn't claiming to be an ESP8266 or ESP32 (which would be a lie). I'm now strongly leaning towards not implementing this - even though we ARE actually running on an ESP32 and thus would not have to lie.
+- [X] not only measure average wind speed over 1 minute but also peak wind speed / gusts.
+
