@@ -273,6 +273,7 @@ void app_main(void)
            * either... */
           if (((too_wet_ctr > 60)
             && (temphum.temp >= 4.0) && (temphum.temp <= 60.0)
+            && (temphum.hum <= 75.0)
             && ((time(NULL) - lastsht4xheat) > 10))
            || (forcesht4xheater > 0)) {
             /* It has been very wet for a long time, temperature is suitable
