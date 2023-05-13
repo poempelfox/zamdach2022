@@ -58,7 +58,7 @@ void ws_windspeedtimercb(void * arg)
   // n.b.: We must not LOG in irq context
   int curwsstate = gpio_get_level(WSPORT);
   lastwsstate = curwsstate;
-  if (curwsstate == 0) { /* We were pulled low, so the aenometer made 1/3 turn */
+  if (curwsstate == 0) { /* We were pulled low, so the anemometer made 1/3 turn */
     int64_t curwsts = wsactualevts;
     taskENTER_CRITICAL_ISR(&wsspinlock);
     wscounter++;
@@ -106,7 +106,7 @@ void ws_init(void)
      * and pulled high by a 10k resistor on the board.
      * Thus, we should normally read a "1" on the GPIO, and it
      * will temporarily be pulled to 0 on every 1/3rd of an
-     * aenometer rotation. */
+     * anemometer rotation. */
     esp_timer_create_args_t tca = {
       .callback = ws_windspeedtimercb,
       .arg = NULL,
@@ -160,7 +160,7 @@ void ws_init(void)
     }
 }
 
-uint16_t ws_readaenometer(void)
+uint16_t ws_readanemometer(void)
 {
     taskENTER_CRITICAL(&wsspinlock);
     uint16_t res = wscounter;

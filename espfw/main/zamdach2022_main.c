@@ -73,10 +73,10 @@ void app_main(void)
     memset(evs, 0, sizeof(evs));
     time_t lastmeasts = 0;
     time_t lastsht4xheat = 0;
-    time_t lastaenomread = 0;
+    time_t lastanemomread = 0;
     /* Initialize the windsensor. This includes initializing the ULP
      * Co-processor, we let it count the number of signals received
-     * from the windsensor / aenometer. */
+     * from the windsensor / anemometer. */
     ws_init();
     /* This is in all OTA-Update examples, so I consider it mandatory.
      * Also, WiFi will not work without nvs_flash_init. */
@@ -175,9 +175,9 @@ void app_main(void)
         /* Read all the sensors */
         float press = lps25hb_readpressure();
         float raing = rg15_readraincount();
-        uint16_t wsctr = ws_readaenometer();
+        uint16_t wsctr = ws_readanemometer();
         /* We'll need this extra timestamp to calculate windspeed from number of pulses */
-        time_t curaenomread = time(NULL);
+        time_t curanemomread = time(NULL);
         uint8_t wsdir = ws_readwinddirection();
         struct sht4xdata temphum;
         sht4x_read(&temphum);
@@ -224,9 +224,9 @@ void app_main(void)
           evs[naevs].raing = NAN;
         }
 
-        if (lastaenomread != 0) { /* Ignore the first read on startup, but other */
+        if (lastanemomread != 0) { /* Ignore the first read on startup, but other */
           /* than that, we really have no way of telling if a reading is valid or not */
-          int tsdif = curaenomread - lastaenomread;
+          int tsdif = curanemomread - lastanemomread;
           /* calculate Wind Speed in km/h from the number of impulses and the timestamp difference */
           float windspeed = 2.4 * wsctr / tsdif;
           float peakws = ws_readpeakws();
@@ -247,7 +247,7 @@ void app_main(void)
           evs[naevs].windspeed = NAN;
           evs[naevs].windspmax = NAN;
         }
-        lastaenomread = curaenomread;
+        lastanemomread = curanemomread;
 
         if (wsdir < 16) { /* Only Range 0-15 is valid */
           char * winddirmap[16] = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };

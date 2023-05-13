@@ -13,7 +13,7 @@
 void ws_init(void);
 
 /* 1 count per second would equal 2.4 km/h wind speed */
-uint16_t ws_readaenometer(void);
+uint16_t ws_readanemometer(void);
 
 /* This returns the peak wind speed seen since the last
  * call of this function (meaning this also resets the
