@@ -12,7 +12,6 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_sleep.h>
-#include <driver/gpio.h>
 #include <math.h>
 #include <nvs_flash.h>
 #include <time.h>
@@ -74,9 +73,7 @@ void app_main(void)
     time_t lastmeasts = 0;
     time_t lastsht4xheat = 0;
     time_t lastanemomread = 0;
-    /* Initialize the windsensor. This includes initializing the ULP
-     * Co-processor, we let it count the number of signals received
-     * from the windsensor / anemometer. */
+    /* Initialize the windsensor. */
     ws_init();
     /* This is in all OTA-Update examples, so I consider it mandatory.
      * Also, WiFi will not work without nvs_flash_init. */
