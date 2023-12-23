@@ -113,10 +113,10 @@ void app_main(void)
     sht4x_init(1);
 
     /* We do NTP to provide useful timestamps in our webserver output. */
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "ntp2.fau.de");
-    sntp_setservername(1, "ntp3.fau.de");
-    sntp_init();
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "ntp2.fau.de");
+    esp_sntp_setservername(1, "ntp3.fau.de");
+    esp_sntp_init();
 
     /* In case we were OTA-updating, we set this fact in a variable for the
      * webserver. Someone will need to click "Keep this firmware" in the
