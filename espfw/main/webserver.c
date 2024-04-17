@@ -7,6 +7,7 @@
 #include <esp_https_ota.h>
 #include <esp_crt_bundle.h>
 #include <esp_netif.h>
+#include <esp_timer.h>
 #include "webserver.h"
 #include "secrets.h"
 
@@ -215,14 +216,24 @@ esp_err_t get_publicdebug_handler(httpd_req_t * req) {
   } else {
     pfp += sprintf(pfp, "<li>Failed to get IPv4 address information :(</li>");
   }
-  esp_ip6_addr_t v6addrs[CONFIG_LWIP_IPV6_NUM_ADDRESSES + 5];
+  esp_ip6_addr_t v6addrs[CONFIG_LWIP_IPV6_NUM_ADDRESSES + 2];
   int nv6ips = esp_netif_get_all_ip6(mainnetif, v6addrs);
-  for (int i = 0; i < nv6ips; i++) {
-    pfp += sprintf(pfp, "<li>IPv6: " IPV6STR "</li>",
-           IPV62STR(v6addrs[i]));
+  if (nv6ips > 0) {
+    for (int i = 0; i < nv6ips; i++) {
+      pfp += sprintf(pfp, "<li>IPv6: " IPV6STR "</li>",
+             IPV62STR(v6addrs[i]));
+    }
+  } else {
+    pfp += sprintf(pfp, "<li>No IPv6 addresses, not even link-local :(</li>");
   }
   pfp += sprintf(pfp, "</ul>");
   pfp += sprintf(pfp, "Last reset reason: %d<br>", esp_reset_reason());
+  int64_t ts = esp_timer_get_time() / 1000000;;
+  pfp += sprintf(pfp, "Uptime: %lld days, ", (ts / 86400));
+  ts = ts % 86400;
+  pfp += sprintf(pfp, "%02lld:", (ts / 3600));
+  ts = ts % 3600;
+  pfp += sprintf(pfp, "%02lld:%02lld<br>", (ts / 60), (ts % 60));
   /* The following line is the default und thus redundant. */
   httpd_resp_set_status(req, "200 OK");
   httpd_resp_set_type(req, "text/html");
